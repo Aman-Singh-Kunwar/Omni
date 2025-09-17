@@ -83,7 +83,7 @@ const CustomerDashboard = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Wrench className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">ServiceHub</h1>
+            <h1 className="text-xl font-bold text-gray-900">Omni</h1>
           </div>
         </div>
         

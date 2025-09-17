@@ -179,7 +179,7 @@ const ServiceMarketplaceLanding = () => {
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Wrench className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">ServiceHub</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-600">
               <div className="flex items-center space-x-1">
@@ -188,7 +188,7 @@ const ServiceMarketplaceLanding = () => {
               </div>
               <div className="flex items-center space-x-1">
                 <Mail className="w-4 h-4" />
-                <span>support@servicehub.com</span>
+                <span>support@Omni.com</span>
               </div>
             </div>
           </div>
@@ -330,7 +330,7 @@ const ServiceMarketplaceLanding = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Wrench className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-bold">ServiceHub</h1>
+            <h1 className="text-xl font-bold">Omni</h1>
           </div>
           <p className="text-gray-400 mb-4">Your trusted partner for all service needs</p>
           <div className="flex justify-center items-center space-x-1 text-gray-400">
