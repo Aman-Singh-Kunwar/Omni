@@ -31,6 +31,38 @@ A full-stack web platform connecting homeowners with trusted local service profe
 
 ---
 
+## 📁 Folder Structure
+
+```
+omni/
+├── public/
+│   ├── index.html
+│   ├── favicon.ico
+│   └── manifest.json
+├── src/
+│   ├── components/
+│   │   ├── common/
+│   │   ├── customer/
+│   │   ├── broker/
+│   │   ├── worker/
+│   │   └── landing/
+│   ├── pages/
+│   ├── hooks/
+│   ├── services/
+│   ├── utils/
+│   ├── context/
+│   ├── assets/
+│   ├── App.js
+│   ├── App.css
+│   ├── index.js
+│   └── index.css
+├── package.json
+├── tailwind.config.js
+└── .gitignore
+```
+
+---
+
 ## 📧 Contact
 
 Aman Singh Kunwar
