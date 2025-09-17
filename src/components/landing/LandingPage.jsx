@@ -1,4 +1,236 @@
-<div>
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User, Briefcase, Wrench, Phone, Mail, MapPin, Star, Clock, Shield } from 'lucide-react';
+
+const LandingPage = () => {
+  const [selectedUserType, setSelectedUserType] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const navigate = useNavigate();
+
+  const userTypes = [
+    {
+      id: 'customer',
+      title: 'Customer',
+      description: 'Find trusted professionals for your home and business needs',
+      icon: User,
+      color: 'from-blue-500 to-blue-600',
+      features: ['Browse Services', 'Book Appointments', 'Track Progress', 'Rate & Review']
+    },
+    {
+      id: 'broker',
+      title: 'Broker',
+      description: 'Connect customers with service professionals and earn commissions',
+      icon: Briefcase,
+      color: 'from-green-500 to-green-600',
+      features: ['Manage Network', 'Earn Commission', 'Analytics Dashboard', 'Client Relations']
+    },
+    {
+      id: 'worker',
+      title: 'Service Provider',
+      description: 'Offer your professional services and grow your business',
+      icon: Wrench,
+      color: 'from-purple-500 to-purple-600',
+      features: ['List Services', 'Manage Bookings', 'Receive Payments', 'Build Reputation']
+    }
+  ];
+
+  const services = [
+    'Plumber', 'Electrician', 'Carpenter', 'Painter', 'AC Repair', 'Cleaning',
+    'Gardening', 'Appliance Repair', 'Pest Control', 'Home Security'
+  ];
+
+  const handleUserTypeSelect = (userType) => {
+    setSelectedUserType(userType);
+    setShowLoginModal(true);
+  };
+
+  const handleLogin = () => {
+    // Navigate to the respective dashboard
+    navigate(`/${selectedUserType}`);
+    setShowLoginModal(false);
+    setSelectedUserType(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Wrench className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
+            </div>
+            <div className="flex items-center space-x-6 text-sm text-gray-600">
+              <div className="flex items-center space-x-1">
+                <Phone className="w-4 h-4" />
+                <span>+91 123-456-7890</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Mail className="w-4 h-4" />
+                <span>support@omniservices.com</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="py-16 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <h2 className="text-5xl font-bold text-gray-900 mb-6">
+            Your <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Omni</span> Service Platform
+          </h2>
+          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            Connect with skilled professionals for all your service needs. 
+            Fast, reliable, and secure service booking at your fingertips.
+          </p>
+          
+          {/* Stats */}
+          <div className="flex justify-center space-x-8 mb-12">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-600">15K+</div>
+              <div className="text-sm text-gray-500">Active Professionals</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600">75K+</div>
+              <div className="text-sm text-gray-500">Happy Customers</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-600">2M+</div>
+              <div className="text-sm text-gray-500">Services Completed</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* User Type Selection */}
+      <section className="py-16 px-4 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <h3 className="text-3xl font-bold text-center text-gray-900 mb-4">
+            Choose Your Role
+          </h3>
+          <p className="text-center text-gray-600 mb-12">
+            Select how you'd like to use our platform
+          </p>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {userTypes.map((type) => {
+              const IconComponent = type.icon;
+              return (
+                <div
+                  key={type.id}
+                  className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                  onClick={() => handleUserTypeSelect(type.id)}
+                >
+                  <div className={`w-16 h-16 bg-gradient-to-r ${type.color} rounded-xl flex items-center justify-center mb-6 mx-auto`}>
+                    <IconComponent className="w-8 h-8 text-white" />
+                  </div>
+                  
+                  <h4 className="text-2xl font-bold text-gray-900 text-center mb-4">
+                    {type.title}
+                  </h4>
+                  
+                  <p className="text-gray-600 text-center mb-6">
+                    {type.description}
+                  </p>
+                  
+                  <ul className="space-y-2 mb-8">
+                    {type.features.map((feature, index) => (
+                      <li key={index} className="flex items-center text-sm text-gray-600">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <button className={`w-full bg-gradient-to-r ${type.color} text-white py-3 px-6 rounded-lg font-semibold hover:opacity-90 transition-opacity`}>
+                    Continue as {type.title}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Services Preview */}
+      <section className="py-16 px-4">
+        <div className="max-w-7xl mx-auto">
+          <h3 className="text-3xl font-bold text-center text-gray-900 mb-4">
+            Services We Offer
+          </h3>
+          <p className="text-center text-gray-600 mb-12">
+            Professional services for every need
+          </p>
+          
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {services.map((service, index) => (
+              <div key={index} className="bg-white rounded-lg p-4 text-center shadow-sm border hover:shadow-md transition-shadow">
+                <div className="text-lg font-semibold text-gray-800">{service}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-16 px-4 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 text-center">
+            <div>
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-8 h-8 text-blue-600" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">24/7 Availability</h4>
+              <p className="text-gray-600">Book services anytime, anywhere with our round-the-clock platform.</p>
+            </div>
+            <div>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Star className="w-8 h-8 text-green-600" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">Verified Professionals</h4>
+              <p className="text-gray-600">All service providers are background-checked and highly rated.</p>
+            </div>
+            <div>
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8 text-purple-600" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">Secure Payments</h4>
+              <p className="text-gray-600">Safe and secure payment processing with multiple options.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <Wrench className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold">Omni</h1>
+          </div>
+          <p className="text-gray-400 mb-4">Your trusted partner for all service needs</p>
+          <div className="flex justify-center items-center space-x-1 text-gray-400">
+            <MapPin className="w-4 h-4" />
+            <span>Serving across India</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+              {selectedUserType && userTypes.find(type => type.id === selectedUserType)?.title} Login
+            </h3>
+            
+            <div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -35,3 +267,15 @@
                 </button>
               </div>
             </div>
+            
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Don't have an account? <a href="#" className="text-blue-600 hover:underline">Sign up</a>
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default LandingPage;

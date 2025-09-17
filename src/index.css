@@ -15,3 +15,32 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Omni brand colors */
+.text-omni-blue { color: #2563eb; }
+.text-omni-green { color: #10b981; }
+.text-omni-purple { color: #8b5cf6; }
+.text-omni-orange { color: #f59e0b; }
+
+.bg-omni-blue { background-color: #2563eb; }
+.bg-omni-green { background-color: #10b981; }
+.bg-omni-purple { background-color: #8b5cf6; }
+.bg-omni-orange { background-color: #f59e0b; }
