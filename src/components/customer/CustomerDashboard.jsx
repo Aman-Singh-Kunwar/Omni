@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import omniLogo from '../../assets/images/omni-logo.png';
 import { 
   Search, Bell, User, MapPin, Calendar, Clock, Star, 
   Filter, Heart, Settings, LogOut, Home, Wrench, 
@@ -80,9 +81,8 @@ const CustomerDashboard = () => {
       <div className="w-64 bg-white shadow-lg">
         <div className="p-6 border-b">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Wrench className="w-5 h-5 text-white" />
-            </div>
+            
+            <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
             <h1 className="text-xl font-bold text-gray-900">Omni</h1>
           </div>
         </div>

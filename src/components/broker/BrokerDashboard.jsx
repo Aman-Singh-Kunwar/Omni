@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import omniLogo from '../../assets/images/omni-logo.png';
 import { Users, DollarSign, TrendingUp, Calendar, Bell, Settings } from 'lucide-react';
 
 const BrokerDashboard = () => {
@@ -31,6 +32,7 @@ const BrokerDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
+                <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
               <h1 className="text-2xl font-bold text-gray-900">Omni Broker</h1>
             </div>
             <div className="flex items-center space-x-4">
