@@ -1,3 +1,5 @@
+export const APP_NAME = 'Omni';
+export const APP_DESCRIPTION = 'Home Services Marketplace';
 export const USER_TYPES = {
   CUSTOMER: 'customer',
   BROKER: 'broker',

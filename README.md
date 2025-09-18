@@ -4,7 +4,7 @@ A full-stack web platform connecting homeowners with trusted local service profe
 
 ---
 
-### ✨ [View Live Demo](https://aman-singh-kunwar.github.io/servicehub/)
+### ✨ [View Live Demo](https://aman-singh-kunwar.github.io/Omni/)
 
 ---
 
