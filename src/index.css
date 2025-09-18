@@ -34,6 +34,19 @@ code {
   background: #94a3b8;
 }
 
+/* Common logo styles you can add to your CSS */
+.logo-header {
+  height: 32px; /* 8 in Tailwind = 32px */
+  width: auto;
+  max-width: 150px;
+}
+
+.logo-footer {
+  height: 32px;
+  width: auto;
+  filter: brightness(0) invert(1); /* Makes dark logos white */
+}
+
 /* Omni brand colors */
 .text-omni-blue { color: #2563eb; }
 .text-omni-green { color: #10b981; }
