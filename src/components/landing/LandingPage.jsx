@@ -69,7 +69,7 @@ const LandingPage = () => {
               <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
               <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
             </div>
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
+            <div className="hidden sm:flex items-center space-x-6 text-sm text-gray-600">
               <div className="flex items-center space-x-1">
                 <Phone className="w-4 h-4" />
                 <span>+91 123-456-7890</span>
