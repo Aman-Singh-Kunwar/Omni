@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import React from 'react';
+// 1. Import HashRouter instead of BrowserRouter
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/landing/LandingPage';
 import CustomerDashboard from './components/customer/CustomerDashboard';
 import BrokerDashboard from './components/broker/BrokerDashboard';
@@ -10,6 +11,7 @@ import './App.css';
 function App() {
   return (
     <AuthProvider>
+      {/* 2. Use the imported Router (which is now HashRouter) */}
       <Router>
         <div className="App">
           <Routes>
@@ -17,6 +19,7 @@ function App() {
             <Route path="/customer" element={<CustomerDashboard />} />
             <Route path="/broker" element={<BrokerDashboard />} />
             <Route path="/worker" element={<WorkerDashboard />} />
+            {/* A fallback route can be useful */}
             <Route path="*" element={<LandingPage />} />
           </Routes>
         </div>
@@ -26,3 +29,4 @@ function App() {
 }
 
 export default App;
+
