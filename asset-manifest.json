@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/Omni/static/css/main.d0800ec9.css",
-    "main.js": "/Omni/static/js/main.abf93869.js",
+    "main.css": "/Omni/static/css/main.0a73c3a9.css",
+    "main.js": "/Omni/static/js/main.c6704a48.js",
     "static/js/453.ebbc063d.chunk.js": "/Omni/static/js/453.ebbc063d.chunk.js",
     "static/media/omni-logo.png": "/Omni/static/media/omni-logo.e923feb4a33cc4aaed87.png",
     "index.html": "/Omni/index.html",
-    "main.d0800ec9.css.map": "/Omni/static/css/main.d0800ec9.css.map",
-    "main.abf93869.js.map": "/Omni/static/js/main.abf93869.js.map",
+    "main.0a73c3a9.css.map": "/Omni/static/css/main.0a73c3a9.css.map",
+    "main.c6704a48.js.map": "/Omni/static/js/main.c6704a48.js.map",
     "453.ebbc063d.chunk.js.map": "/Omni/static/js/453.ebbc063d.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.d0800ec9.css",
-    "static/js/main.abf93869.js"
+    "static/css/main.0a73c3a9.css",
+    "static/js/main.c6704a48.js"
   ]
 }
