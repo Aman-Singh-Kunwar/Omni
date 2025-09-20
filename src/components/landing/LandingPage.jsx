@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { User, Briefcase, Wrench, Phone, Mail, MapPin, Star, Clock, Shield, Check } from 'lucide-react';
-import omniLogo from '../../assets/images/omni-logo.png';
 
 const LandingPage = () => {
   const [selectedUserType, setSelectedUserType] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const navigate = useNavigate();
+  const [wantToBeBroker, setWantToBeBroker] = useState(false);
+
+  // Mock logo placeholder
+  const omniLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%233B82F6'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='white' font-family='Arial' font-size='18' font-weight='bold'%3EO%3C/text%3E%3C/svg%3E";
 
   const userTypes = [
     {
@@ -17,15 +18,6 @@ const LandingPage = () => {
       color: 'from-blue-500 to-blue-600',
       hoverColor: 'hover:shadow-blue-300/40',
       features: ['Browse Services', 'Book Appointments', 'Track Progress', 'Rate & Review'],
-    },
-    {
-      id: 'broker',
-      title: 'Broker',
-      description: 'Connect customers with professionals and earn commissions.',
-      icon: Briefcase,
-      color: 'from-green-500 to-green-600',
-      hoverColor: 'hover:shadow-green-300/40',
-      features: ['Manage Network', 'Earn Commission', 'Analytics Dashboard', 'Client Relations'],
     },
     {
       id: 'worker',
@@ -54,30 +46,41 @@ const LandingPage = () => {
   const handleUserTypeSelect = (userType) => {
     setSelectedUserType(userType);
     setShowLoginModal(true);
+    setWantToBeBroker(false); // Reset broker option
   };
 
   const handleLogin = () => {
-    if (selectedUserType) {
-        navigate(`/${selectedUserType}`);
+    if (wantToBeBroker) {
+      // Navigate to broker dashboard
+      window.location.hash = '#/broker';
+    } else if (selectedUserType) {
+      // Navigate to selected user type dashboard
+      window.location.hash = `#/${selectedUserType}`;
     }
     setShowLoginModal(false);
     setSelectedUserType(null);
+    setWantToBeBroker(false);
   };
 
-  // Add a simple CSS animation for the background
+  const handleBrokerToggle = () => {
+    setWantToBeBroker(!wantToBeBroker);
+  };
+
   const GlobalStyles = () => (
-    <style jsx global>{`
-      @keyframes gradient-animation {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-      .animated-gradient {
-        background: linear-gradient(-45deg, #f5f7fa, #eef2f5, #f5f7fa, #eef2f5);
-        background-size: 400% 400%;
-        animation: gradient-animation 15s ease infinite;
-      }
-    `}</style>
+    <style>
+      {`
+        @keyframes gradient-animation {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animated-gradient {
+          background: linear-gradient(-45deg, #f5f7fa, #eef2f5, #f5f7fa, #eef2f5);
+          background-size: 400% 400%;
+          animation: gradient-animation 15s ease infinite;
+        }
+      `}
+    </style>
   );
 
   return (
@@ -117,12 +120,12 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* User Type Selection */}
+        {/* User Type Selection - Now only Customer and Service Provider */}
         <section className="py-20 px-4 bg-white">
           <div className="max-w-7xl mx-auto">
             <h3 className="text-3xl font-bold text-center text-gray-900 mb-4">Choose Your Role</h3>
             <p className="text-center text-gray-600 mb-12">Select how you'd like to use our platform</p>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               {userTypes.map((type) => (
                 <div key={type.id} onClick={() => handleUserTypeSelect(type.id)} className={`bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-2xl ${type.hoverColor} transition-all duration-300 cursor-pointer transform hover:-translate-y-2 flex flex-col`}>
                   <div className={`w-16 h-16 bg-gradient-to-r ${type.color} rounded-xl flex items-center justify-center mb-6 self-start`}>
@@ -220,22 +223,96 @@ const LandingPage = () => {
           </div>
         </footer>
 
-        {/* Login Modal */}
+        {/* Enhanced Login Modal with Broker Option */}
         {showLoginModal && (
           <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-                {selectedUserType && userTypes.find((type) => type.id === selectedUserType)?.title} Login
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+                {wantToBeBroker 
+                  ? 'Broker Login' 
+                  : selectedUserType && userTypes.find((type) => type.id === selectedUserType)?.title + ' Login'
+                }
               </h3>
+              
+              {/* Broker Toggle Section */}
+              <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="brokerToggle"
+                    checked={wantToBeBroker}
+                    onChange={handleBrokerToggle}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label htmlFor="brokerToggle" className="flex items-center cursor-pointer">
+                    <Briefcase className="w-5 h-5 text-green-600 mr-2" />
+                    <div>
+                      <span className="text-sm font-medium text-green-800">Want to become a Broker?</span>
+                      <p className="text-xs text-green-600 mt-1">
+                        Connect customers with professionals and earn commissions
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <div className="space-y-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter your email"/></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter your password"/></div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                    placeholder="Enter your email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input 
+                    type="password" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                    placeholder="Enter your password"
+                  />
+                </div>
               </div>
+
+              {/* Display additional info for broker option */}
+              {wantToBeBroker && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>As a Broker, you'll get:</strong>
+                  </p>
+                  <ul className="text-xs text-blue-600 mt-1 space-y-1">
+                    <li>• Manage network of service providers</li>
+                    <li>• Earn commission on each booking</li>
+                    <li>• Access to analytics dashboard</li>
+                    <li>• Priority customer support</li>
+                  </ul>
+                </div>
+              )}
+
               <div className="flex space-x-4 mt-6">
-                <button type="button" onClick={() => setShowLoginModal(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold">Cancel</button>
-                <button type="button" onClick={handleLogin} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Login</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    setWantToBeBroker(false);
+                  }} 
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleLogin} 
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                >
+                  {wantToBeBroker ? 'Login as Broker' : 'Login'}
+                </button>
               </div>
-              <p className="text-center text-sm text-gray-500 mt-4">Don't have an account? <a href="#" className="text-blue-600 hover:underline font-semibold">Sign up</a></p>
+              <p className="text-center text-sm text-gray-500 mt-4">
+                Don't have an account? 
+                <a href="#" className="text-blue-600 hover:underline font-semibold ml-1">Sign up</a>
+              </p>
             </div>
           </div>
         )}
