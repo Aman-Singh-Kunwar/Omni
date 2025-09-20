@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
+import omniLogo from '../../assets/images/omni-logo.png';
 import { User, Briefcase, Wrench, Phone, Mail, MapPin, Star, Clock, Shield, Check } from 'lucide-react';
 
 const LandingPage = () => {
   const [selectedUserType, setSelectedUserType] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [wantToBeBroker, setWantToBeBroker] = useState(false);
-
-  // Mock logo placeholder
-  const omniLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%233B82F6'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='white' font-family='Arial' font-size='18' font-weight='bold'%3EO%3C/text%3E%3C/svg%3E";
 
   const userTypes = [
     {
