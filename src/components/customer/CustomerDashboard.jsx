@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import omniLogo from '../../assets/images/omni-logo.png'; 
+import omniLogo from '../../assets/images/omni-logo.png';
 import {
   Search, Bell, User, Calendar, Clock, Star,
   Filter, Heart, Settings, LogOut, Home, Wrench,
   Zap, Paintbrush, Droplets, Wind, Scissors, Car,
-  Phone, MessageCircle, CreditCard, CheckCircle, Package, Menu, X
+  Phone, MessageCircle, CreditCard, CheckCircle, Package, Menu, X, ChevronDown, Briefcase
 } from 'lucide-react';
 
 const CustomerDashboard = () => {
@@ -13,6 +13,8 @@ const CustomerDashboard = () => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showRoleSwitchModal, setShowRoleSwitchModal] = useState(false);
 
   // Sample data
   const services = [
@@ -49,6 +51,16 @@ const CustomerDashboard = () => {
     setSelectedService(null);
   };
 
+  const handleRoleSwitch = (role) => {
+    setShowRoleSwitchModal(false);
+    setShowUserMenu(false);
+    if (role === 'worker') {
+      window.location.hash = '#/worker';
+    } else if (role === 'broker') {
+      window.location.hash = '#/broker';
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'text-green-600 bg-green-100';
@@ -75,318 +87,419 @@ const CustomerDashboard = () => {
     { id: 'settings', name: 'Settings', icon: Settings }
   ];
 
+  // Global Styles for Animation
+  const GlobalStyles = () => (
+    <style>
+      {`
+        @keyframes gradient-animation {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animated-gradient {
+          background: linear-gradient(-45deg, #f8fafc, #f1f5f9, #f8fafc, #f1f5f9);
+          background-size: 400% 400%;
+          animation: gradient-animation 15s ease infinite;
+        }
+      `}
+    </style>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center space-x-2">
-                <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
-                <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
+    <>
+      <GlobalStyles />
+      <div className="min-h-screen bg-gray-50 animated-gradient">
+        {/* Top Navigation */}
+        <nav className="bg-white/80 shadow-sm border-b backdrop-blur-md sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-8">
+                <div className="flex items-center space-x-2">
+                  <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
+                  <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
+                </div>
+
+                {/* Desktop Navigation */}
+                <div className="hidden md:flex items-center space-x-1">
+                  {navItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                        activeTab === item.id
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-sm font-medium">{item.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex items-center space-x-1">
+              {/* Right side Actions */}
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                <button className="relative p-2 text-gray-400 hover:text-gray-600">
+                  <Bell className="w-5 h-5" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                
+                {/* User Menu with Role Switch */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="hidden md:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="text-sm text-left">
+                      <p className="font-medium text-gray-900">Alex Johnson</p>
+                      <p className="text-gray-500 text-xs">Customer</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
+                      <button
+                        onClick={() => setShowRoleSwitchModal(true)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      >
+                        <Briefcase className="w-4 h-4 mr-3" />
+                        Switch Role
+                      </button>
+                      <button
+                        onClick={() => setShowUserMenu(false)}
+                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-gray-100 flex items-center"
+                      >
+                        <LogOut className="w-4 h-4 mr-3" />
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-2 text-gray-500">
+                  {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Navigation Menu */}
+          {showMobileMenu && (
+            <div className="md:hidden border-t border-gray-200 bg-white/90 backdrop-blur-sm">
+              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                 {navItems.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setShowMobileMenu(false);
+                    }}
+                    className={`w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium ${
                       activeTab === item.id
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                     }`}
                   >
-                    <item.icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{item.name}</span>
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.name}</span>
                   </button>
                 ))}
-              </div>
-            </div>
-
-            {/* Right side Actions */}
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <button className="relative p-2 text-gray-400 hover:text-gray-600">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-              <div className="hidden md:flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium text-gray-900">Alex Johnson</p>
-                  <p className="text-gray-500 text-xs">Customer</p>
-                </div>
-              </div>
-              <div className="hidden md:flex items-center">
-                <button className="text-gray-600 hover:text-red-600 transition-colors p-2">
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-              {/* Mobile menu button */}
-              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-2 text-gray-500">
-                {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Menu */}
-        {showMobileMenu && (
-          <div className="md:hidden border-t border-gray-200">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setShowMobileMenu(false);
-                  }}
-                  className={`w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium ${
-                    activeTab === item.id
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </button>
-              ))}
-              <div className="border-t pt-2 mt-2">
-                <button className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800">
+                <div className="border-t pt-2 mt-2">
+                  <button 
+                    onClick={() => setShowRoleSwitchModal(true)}
+                    className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                  >
+                    <Briefcase className="w-5 h-5" />
+                    <span>Switch Role</span>
+                  </button>
+                  <button className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50 hover:text-red-800">
                     <LogOut className="w-5 h-5" />
                     <span>Logout</span>
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </nav>
+
+        {/* Main Content */}
+        <main className="px-4 sm:px-6 py-8">
+          <div className="max-w-7xl mx-auto">
+            <header className="mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Welcome back, Alex!</h2>
+              <p className="text-gray-600 mt-1">Ready to book your next service? It's on us today, Happy Friday from Dehradun!</p>
+            </header>
+
+            {activeTab === 'home' && (
+              <div className="space-y-10">
+                {/* Search Bar */}
+                <div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search for services like 'Plumber' or 'AC Repair'..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur-sm"
+                    />
+                    <button className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800">
+                      <Filter className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm border"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Total Bookings</p><p className="text-2xl font-bold text-gray-900">24</p></div><Package className="w-8 h-8 text-blue-500" /></div></div>
+                  <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm border"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Completed</p><p className="text-2xl font-bold text-green-600">22</p></div><CheckCircle className="w-8 h-8 text-green-500" /></div></div>
+                  <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm border"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Upcoming</p><p className="text-2xl font-bold text-blue-600">2</p></div><Clock className="w-8 h-8 text-blue-500" /></div></div>
+                  <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm border"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Money Saved</p><p className="text-2xl font-bold text-purple-600">₹2,450</p></div><CreditCard className="w-8 h-8 text-purple-500" /></div></div>
+                </div>
+
+                {/* Services Grid */}
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-6">Popular Services</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+                    {services.map((service) => (
+                      <div key={service.id} onClick={() => handleServiceSelect(service)} className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group border">
+                        <div className={`w-12 h-12 ${service.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                          <service.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <h4 className="font-semibold text-gray-900 mb-2">{service.name}</h4>
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center space-x-1"><Star className="w-4 h-4 text-yellow-400 fill-current" /><span>{service.rating}</span></div>
+                          <span className="hidden sm:inline">{service.providers} providers</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Featured Providers */}
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-6">Top Rated Providers</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {featuredProviders.map((provider) => (
+                      <div key={provider.id} className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow border">
+                        <div className="flex items-center space-x-4 mb-4">
+                          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-3xl">{provider.image}</div>
+                          <div><h4 className="font-semibold text-gray-900">{provider.name}</h4><p className="text-sm text-gray-600">{provider.service}</p></div>
+                        </div>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-1">{renderStars(provider.rating)}<span className="text-sm text-gray-600 ml-2">({provider.reviews})</span></div>
+                          <span className="font-semibold text-blue-600">{provider.price}</span>
+                        </div>
+                        <button className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">Book Now</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Other Tabs Content */}
+            {activeTab !== 'home' && (
+              <div className="bg-white/80 backdrop-blur-sm p-6 sm:p-8 rounded-xl shadow-sm border">
+                  {activeTab === 'bookings' && (
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-6">My Bookings</h3>
+                          <div className="space-y-4">
+                          {recentBookings.map((booking) => (
+                              <div key={booking.id} className="border p-4 sm:p-6 rounded-lg bg-white/60 backdrop-blur-sm">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                      <div className="flex items-center space-x-4">
+                                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0"><Wrench className="w-6 h-6 text-blue-600" /></div>
+                                      <div>
+                                          <h4 className="font-semibold text-gray-900">{booking.service}</h4>
+                                          <p className="text-sm text-gray-600">with {booking.provider}</p>
+                                          <p className="text-sm text-gray-500 mt-1">{booking.date} at {booking.time}</p>
+                                      </div>
+                                      </div>
+                                      <div className="text-left sm:text-right w-full sm:w-auto">
+                                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>{booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span>
+                                      {booking.rating && <div className="flex items-center mt-2 justify-start sm:justify-end">{renderStars(booking.rating)}</div>}
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {activeTab === 'favorites' && (
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-6">Favorite Providers</h3>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {featuredProviders.slice(0, 2).map((provider) => (
+                              <div key={provider.id} className="border p-6 rounded-lg bg-white/60 backdrop-blur-sm">
+                              <div className="flex items-start justify-between mb-4">
+                                  <div className="flex items-center space-x-4">
+                                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-3xl shrink-0">{provider.image}</div>
+                                  <div>
+                                      <h4 className="font-semibold text-gray-900">{provider.name}</h4>
+                                      <p className="text-sm text-gray-600">{provider.service}</p>
+                                      <div className="flex items-center space-x-1 mt-1">{renderStars(provider.rating)}<span className="text-sm text-gray-600">({provider.reviews})</span></div>
+                                  </div>
+                                  </div>
+                                  <Heart className="w-6 h-6 text-red-500 fill-current shrink-0" />
+                              </div>
+                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                                  <button className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Book Again</button>
+                                  <div className="flex space-x-3">
+                                  <button className="flex-1 sm:flex-none px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"><MessageCircle className="w-5 h-5 text-gray-600" /></button>
+                                  <button className="flex-1 sm:flex-none px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"><Phone className="w-5 h-5 text-gray-600" /></button>
+                                  </div>
+                              </div>
+                              </div>
+                          ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {activeTab === 'profile' && (
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
+                          <div className="max-w-2xl mx-auto">
+                              <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
+                                  <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center shrink-0"><User className="w-12 h-12 text-white" /></div>
+                                  <div>
+                                  <h4 className="text-xl font-semibold text-gray-900">Alex Johnson</h4>
+                                  <p className="text-gray-600">alex.johnson@email.com</p>
+                                  <p className="text-gray-600">+91 98765-43210</p>
+                                  </div>
+                              </div>
+                              <div className="space-y-4">
+                                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" defaultValue="Alex Johnson" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"/></div>
+                                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" defaultValue="alex.johnson@email.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"/></div>
+                                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" defaultValue="+91 98765-43210" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"/></div>
+                                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><textarea rows={3} placeholder="Enter your address" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"/></div>
+                                  <button className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">Save Changes</button>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+                  
+                  {activeTab === 'settings' && (
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-6">Settings</h3>
+                          <div className="space-y-6 max-w-2xl mx-auto">
+                              <div className="border rounded-lg p-6 bg-white/60 backdrop-blur-sm">
+                                  <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
+                                  <div className="space-y-4">
+                                  <div className="flex items-center justify-between"><span className="text-gray-700">Email Notifications</span><button className="w-12 h-6 bg-blue-600 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform translate-x-6 transition-transform"></span></button></div>
+                                  <div className="flex items-center justify-between"><span className="text-gray-700">SMS Notifications</span><button className="w-12 h-6 bg-gray-300 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform transition-transform"></span></button></div>
+                                  </div>
+                              </div>
+                              <div className="border rounded-lg p-6 bg-white/60 backdrop-blur-sm">
+                                  <h4 className="font-semibold text-gray-900 mb-4">Privacy</h4>
+                                  <div className="space-y-4">
+                                  <div className="flex items-center justify-between"><span className="text-gray-700">Profile Visibility</span><button className="w-12 h-6 bg-blue-600 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform translate-x-6 transition-transform"></span></button></div>
+                                  <div className="flex items-center justify-between"><span className="text-gray-700">Show Booking History</span><button className="w-12 h-6 bg-gray-300 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform transition-transform"></span></button></div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* Service Booking Modal */}
+        {showBookingModal && selectedService && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full">
+              <div className="text-center mb-6">
+                <div className={`w-16 h-16 ${selectedService.color} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                  <selectedService.icon className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Book {selectedService.name}</h3>
+                <p className="text-gray-600">Choose your preferred date and time</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
+                  <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" min={new Date().toISOString().split("T")[0]} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option>
+                    <option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea rows={3} placeholder="Describe your requirements..." className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                </div>
+              </div>
+              <div className="flex space-x-4 mt-6">
+                <button onClick={() => setShowBookingModal(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Cancel</button>
+                <button onClick={handleBookService} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Book Service</button>
               </div>
             </div>
           </div>
         )}
-      </nav>
 
-      {/* Main Content */}
-      <main className="px-4 sm:px-6 py-8">
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Welcome back, Alex!</h2>
-            <p className="text-gray-600 mt-1">Ready to book your next service? It's on us today, Happy Friday from Dehradun!</p>
-          </header>
-
-          {activeTab === 'home' && (
-            <div className="space-y-10">
-              {/* Search Bar */}
-              <div>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Search for services like 'Plumber' or 'AC Repair'..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800">
-                    <Filter className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Total Bookings</p><p className="text-2xl font-bold text-gray-900">24</p></div><Package className="w-8 h-8 text-blue-500" /></div></div>
-                <div className="bg-white p-6 rounded-xl shadow-sm"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Completed</p><p className="text-2xl font-bold text-green-600">22</p></div><CheckCircle className="w-8 h-8 text-green-500" /></div></div>
-                <div className="bg-white p-6 rounded-xl shadow-sm"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Upcoming</p><p className="text-2xl font-bold text-blue-600">2</p></div><Clock className="w-8 h-8 text-blue-500" /></div></div>
-                <div className="bg-white p-6 rounded-xl shadow-sm"><div className="flex items-center justify-between"><div><p className="text-sm text-gray-600">Money Saved</p><p className="text-2xl font-bold text-purple-600">₹2,450</p></div><CreditCard className="w-8 h-8 text-purple-500" /></div></div>
-              </div>
-
-              {/* Services Grid */}
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-6">Popular Services</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
-                  {services.map((service) => (
-                    <div key={service.id} onClick={() => handleServiceSelect(service)} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group">
-                      <div className={`w-12 h-12 ${service.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                        <service.icon className="w-6 h-6 text-white" />
-                      </div>
-                      <h4 className="font-semibold text-gray-900 mb-2">{service.name}</h4>
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <div className="flex items-center space-x-1"><Star className="w-4 h-4 text-yellow-400 fill-current" /><span>{service.rating}</span></div>
-                        <span className="hidden sm:inline">{service.providers} providers</span>
-                      </div>
+        {/* Role Switch Modal */}
+        {showRoleSwitchModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Switch Role</h3>
+              <p className="text-gray-600 text-center mb-6">Choose the role you want to switch to</p>
+              
+              <div className="space-y-4">
+                <button
+                  onClick={() => handleRoleSwitch('worker')}
+                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors text-left"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Wrench className="w-6 h-6 text-purple-600" />
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Featured Providers */}
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-6">Top Rated Providers</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {featuredProviders.map((provider) => (
-                    <div key={provider.id} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-3xl">{provider.image}</div>
-                        <div><h4 className="font-semibold text-gray-900">{provider.name}</h4><p className="text-sm text-gray-600">{provider.service}</p></div>
-                      </div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-1">{renderStars(provider.rating)}<span className="text-sm text-gray-600 ml-2">({provider.reviews})</span></div>
-                        <span className="font-semibold text-blue-600">{provider.price}</span>
-                      </div>
-                      <button className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">Book Now</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Other Tabs Content */}
-          {activeTab !== 'home' && (
-            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm">
-                {activeTab === 'bookings' && (
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">My Bookings</h3>
-                        <div className="space-y-4">
-                        {recentBookings.map((booking) => (
-                            <div key={booking.id} className="border p-4 sm:p-6 rounded-lg">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                    <div className="flex items-center space-x-4">
-                                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0"><Wrench className="w-6 h-6 text-blue-600" /></div>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900">{booking.service}</h4>
-                                        <p className="text-sm text-gray-600">with {booking.provider}</p>
-                                        <p className="text-sm text-gray-500 mt-1">{booking.date} at {booking.time}</p>
-                                    </div>
-                                    </div>
-                                    <div className="text-left sm:text-right w-full sm:w-auto">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>{booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span>
-                                    {booking.rating && <div className="flex items-center mt-2 justify-start sm:justify-end">{renderStars(booking.rating)}</div>}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        </div>
+                      <h4 className="font-semibold text-gray-900">Switch to Service Provider</h4>
+                      <p className="text-sm text-gray-600">Offer your professional services</p>
                     </div>
-                )}
-
-                {activeTab === 'favorites' && (
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">Favorite Providers</h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {featuredProviders.slice(0, 2).map((provider) => (
-                            <div key={provider.id} className="border p-6 rounded-lg">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex items-center space-x-4">
-                                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-3xl shrink-0">{provider.image}</div>
-                                <div>
-                                    <h4 className="font-semibold text-gray-900">{provider.name}</h4>
-                                    <p className="text-sm text-gray-600">{provider.service}</p>
-                                    <div className="flex items-center space-x-1 mt-1">{renderStars(provider.rating)}<span className="text-sm text-gray-600">({provider.reviews})</span></div>
-                                </div>
-                                </div>
-                                <Heart className="w-6 h-6 text-red-500 fill-current shrink-0" />
-                            </div>
-                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                                <button className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Book Again</button>
-                                <div className="flex space-x-3">
-                                <button className="flex-1 sm:flex-none px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"><MessageCircle className="w-5 h-5 text-gray-600" /></button>
-                                <button className="flex-1 sm:flex-none px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"><Phone className="w-5 h-5 text-gray-600" /></button>
-                                </div>
-                            </div>
-                            </div>
-                        ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'profile' && (
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
-                        <div className="max-w-2xl mx-auto">
-                            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
-                                <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center shrink-0"><User className="w-12 h-12 text-white" /></div>
-                                <div>
-                                <h4 className="text-xl font-semibold text-gray-900">Alex Johnson</h4>
-                                <p className="text-gray-600">alex.johnson@email.com</p>
-                                <p className="text-gray-600">+91 98765-43210</p>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" defaultValue="Alex Johnson" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" defaultValue="alex.johnson@email.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" defaultValue="+91 98765-43210" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><textarea rows={3} placeholder="Enter your address" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <button className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">Save Changes</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                  </div>
+                </button>
                 
-                {activeTab === 'settings' && (
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">Settings</h3>
-                        <div className="space-y-6 max-w-2xl mx-auto">
-                            <div className="border rounded-lg p-6">
-                                <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
-                                <div className="space-y-4">
-                                <div className="flex items-center justify-between"><span className="text-gray-700">Email Notifications</span><button className="w-12 h-6 bg-blue-600 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform translate-x-6 transition-transform"></span></button></div>
-                                <div className="flex items-center justify-between"><span className="text-gray-700">SMS Notifications</span><button className="w-12 h-6 bg-gray-300 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform transition-transform"></span></button></div>
-                                </div>
-                            </div>
-                            <div className="border rounded-lg p-6">
-                                <h4 className="font-semibold text-gray-900 mb-4">Privacy</h4>
-                                <div className="space-y-4">
-                                <div className="flex items-center justify-between"><span className="text-gray-700">Profile Visibility</span><button className="w-12 h-6 bg-blue-600 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform translate-x-6 transition-transform"></span></button></div>
-                                <div className="flex items-center justify-between"><span className="text-gray-700">Show Booking History</span><button className="w-12 h-6 bg-gray-300 rounded-full p-0.5 flex items-center transition-colors"><span className="w-5 h-5 bg-white rounded-full shadow-md transform transition-transform"></span></button></div>
-                                </div>
-                            </div>
-                        </div>
+                <button
+                  onClick={() => handleRoleSwitch('broker')}
+                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors text-left"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Briefcase className="w-6 h-6 text-green-600" />
                     </div>
-                )}
-            </div>
-          )}
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Switch to Broker</h4>
+                      <p className="text-sm text-gray-600">Manage a network of professionals</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
 
-        </div>
-      </main>
-
-      {/* Service Booking Modal */}
-      {showBookingModal && selectedService && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className={`w-16 h-16 ${selectedService.color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-                <selectedService.icon className="w-8 h-8 text-white" />
+              <div className="flex space-x-4 mt-6">
+                <button 
+                  onClick={() => setShowRoleSwitchModal(false)} 
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
+                >
+                  Cancel
+                </button>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">Book {selectedService.name}</h3>
-              <p className="text-gray-600">Choose your preferred date and time</p>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" min={new Date().toISOString().split("T")[0]} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                  <option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option>
-                  <option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea rows={3} placeholder="Describe your requirements..." className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-            </div>
-            <div className="flex space-x-4 mt-6">
-              <button onClick={() => setShowBookingModal(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Cancel</button>
-              <button onClick={handleBookService} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Book Service</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 

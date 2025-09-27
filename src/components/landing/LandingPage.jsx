@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import omniLogo from '../../assets/images/omni-logo.png';
-import { User, Briefcase, Wrench, Phone, Mail, MapPin, Star, Clock, Shield, Check } from 'lucide-react';
+import { User, Wrench, Phone, Mail, MapPin, Star, Clock, Shield, Check } from 'lucide-react';
 
 const LandingPage = () => {
   const [selectedUserType, setSelectedUserType] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [wantToBeBroker, setWantToBeBroker] = useState(false);
 
   const userTypes = [
     {
@@ -44,24 +43,15 @@ const LandingPage = () => {
   const handleUserTypeSelect = (userType) => {
     setSelectedUserType(userType);
     setShowLoginModal(true);
-    setWantToBeBroker(false); // Reset broker option
   };
 
   const handleLogin = () => {
-    if (wantToBeBroker) {
-      // Navigate to broker dashboard
-      window.location.hash = '#/broker';
-    } else if (selectedUserType) {
+    if (selectedUserType) {
       // Navigate to selected user type dashboard
       window.location.hash = `#/${selectedUserType}`;
     }
     setShowLoginModal(false);
     setSelectedUserType(null);
-    setWantToBeBroker(false);
-  };
-
-  const handleBrokerToggle = () => {
-    setWantToBeBroker(!wantToBeBroker);
   };
 
   const GlobalStyles = () => (
@@ -92,6 +82,7 @@ const LandingPage = () => {
               <div className="flex items-center space-x-2">
                 <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
                 <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
+                            
               </div>
               <div className="hidden sm:flex items-center space-x-6 text-sm text-gray-600">
                 <div className="flex items-center space-x-1.5"><Phone className="w-4 h-4" /><span>+91 123-456-7890</span></div>
@@ -118,14 +109,14 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* User Type Selection - Now only Customer and Service Provider */}
-        <section className="py-20 px-4 bg-white">
+        {/* User Type Selection - Only Customer and Service Provider */}
+        <section className="py-20 px-4 bg-white/80 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto">
             <h3 className="text-3xl font-bold text-center text-gray-900 mb-4">Choose Your Role</h3>
             <p className="text-center text-gray-600 mb-12">Select how you'd like to use our platform</p>
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               {userTypes.map((type) => (
-                <div key={type.id} onClick={() => handleUserTypeSelect(type.id)} className={`bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-2xl ${type.hoverColor} transition-all duration-300 cursor-pointer transform hover:-translate-y-2 flex flex-col`}>
+                <div key={type.id} onClick={() => handleUserTypeSelect(type.id)} className={`bg-white/90 backdrop-blur-sm border border-gray-200 rounded-2xl p-8 hover:shadow-2xl ${type.hoverColor} transition-all duration-300 cursor-pointer transform hover:-translate-y-2 flex flex-col`}>
                   <div className={`w-16 h-16 bg-gradient-to-r ${type.color} rounded-xl flex items-center justify-center mb-6 self-start`}>
                     <type.icon className="w-8 h-8 text-white" />
                   </div>
@@ -150,7 +141,7 @@ const LandingPage = () => {
             <p className="text-center text-gray-600 mb-12">Professional services for every need, available now in Dehradun.</p>
             <div className="flex flex-wrap justify-center gap-4">
               {services.map((service, index) => (
-                <div key={index} className="bg-white rounded-full py-2 px-5 text-center shadow-sm border hover:shadow-md transition-shadow cursor-pointer">
+                <div key={index} className="bg-white/90 backdrop-blur-sm rounded-full py-2 px-5 text-center shadow-sm border hover:shadow-md transition-shadow cursor-pointer">
                   <div className="font-semibold text-gray-800">{service}</div>
                 </div>
               ))}
@@ -159,7 +150,7 @@ const LandingPage = () => {
         </section>
 
         {/* Features */}
-        <section className="py-20 px-4 bg-white">
+        <section className="py-20 px-4 bg-white/80 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-3 gap-10 text-center">
               <div>
@@ -186,7 +177,10 @@ const LandingPage = () => {
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <div className="flex flex-col items-center md:items-start">
-                <div className="flex items-center space-x-2 mb-4"><img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" /><h1 className="text-xl font-bold">Omni</h1></div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
+                  <h1 className="text-xl font-bold">Omni</h1>
+                </div>
                 <p className="text-gray-300 text-sm text-center md:text-left">Your trusted platform for connecting with skilled professionals. Fast, reliable, and secure.</p>
                 <div className="flex items-center space-x-1.5 text-gray-400 mt-4"><MapPin className="w-4 h-4" /><span>Serving across India</span></div>
               </div>
@@ -221,40 +215,15 @@ const LandingPage = () => {
           </div>
         </footer>
 
-        {/* Enhanced Login Modal with Broker Option */}
+        {/* Simple Login Modal */}
         {showLoginModal && (
           <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full">
               <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-                {wantToBeBroker 
-                  ? 'Broker Login' 
-                  : selectedUserType && userTypes.find((type) => type.id === selectedUserType)?.title + ' Login'
-                }
+                {selectedUserType && userTypes.find((type) => type.id === selectedUserType)?.title + ' Login'}
               </h3>
               
-              {/* Broker Toggle Section */}
-              <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="brokerToggle"
-                    checked={wantToBeBroker}
-                    onChange={handleBrokerToggle}
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                  />
-                  <label htmlFor="brokerToggle" className="flex items-center cursor-pointer">
-                    <Briefcase className="w-5 h-5 text-green-600 mr-2" />
-                    <div>
-                      <span className="text-sm font-medium text-green-800">Want to become a Broker?</span>
-                      <p className="text-xs text-green-600 mt-1">
-                        Connect customers with professionals and earn commissions
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-4">
+              <div className="space-y-4 mt-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input 
@@ -273,28 +242,10 @@ const LandingPage = () => {
                 </div>
               </div>
 
-              {/* Display additional info for broker option */}
-              {wantToBeBroker && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>As a Broker, you'll get:</strong>
-                  </p>
-                  <ul className="text-xs text-blue-600 mt-1 space-y-1">
-                    <li>• Manage network of service providers</li>
-                    <li>• Earn commission on each booking</li>
-                    <li>• Access to analytics dashboard</li>
-                    <li>• Priority customer support</li>
-                  </ul>
-                </div>
-              )}
-
               <div className="flex space-x-4 mt-6">
                 <button 
                   type="button" 
-                  onClick={() => {
-                    setShowLoginModal(false);
-                    setWantToBeBroker(false);
-                  }} 
+                  onClick={() => setShowLoginModal(false)} 
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
                 >
                   Cancel
@@ -304,7 +255,7 @@ const LandingPage = () => {
                   onClick={handleLogin} 
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
                 >
-                  {wantToBeBroker ? 'Login as Broker' : 'Login'}
+                  Login
                 </button>
               </div>
               <p className="text-center text-sm text-gray-500 mt-4">
