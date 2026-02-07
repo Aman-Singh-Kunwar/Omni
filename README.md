@@ -1,71 +1,407 @@
-# Omni - Home Services Marketplace
+# Omni Monorepo
 
-A full-stack web platform connecting homeowners with trusted local service professionals like electricians, plumbers, and painters etc.
+A role-based service marketplace built as a JavaScript monorepo with one Express API and four React apps:
+- Landing app
+- Customer app
+- Broker app
+- Worker app
 
----
+This README covers complete local setup from clone to first run, including environment variables for every app.
 
-### ✨ [View Live Demo](https://aman-singh-kunwar.github.io/Omni/)
+## Table of Contents
 
----
+1. [What This Project Includes](#what-this-project-includes)
+2. [Tech Stack](#tech-stack)
+3. [Monorepo Structure](#monorepo-structure)
+4. [Port Map](#port-map)
+5. [Prerequisites](#prerequisites)
+6. [Clone and Install](#clone-and-install)
+7. [Environment Setup (.env)](#environment-setup-env)
+8. [Run the Project Locally](#run-the-project-locally)
+9. [Build for Production](#build-for-production)
+10. [Application Workflow](#application-workflow)
+11. [API Overview](#api-overview)
+12. [Data Model Overview](#data-model-overview)
+13. [Troubleshooting](#troubleshooting)
+14. [Security Notes](#security-notes)
 
-## 🚀 Core Features
+## What This Project Includes
 
-- **Service Discovery:** Customers can browse and search for various home services.
-- **Provider Profiles:** Service professionals can create detailed profiles showcasing their skills, experience, and ratings.
-- **Booking System:** Customers can schedule appointments directly through the platform.
-- **User Authentication:** Secure registration and login for both customers and service providers using JWT.
-- **Dashboard:** Separate dashboards for customers to manage bookings and for providers to manage their services and schedule.
-- **Reviews & Ratings:** Users can leave feedback on completed jobs to build trust within the community.
+- `backend`: Main REST API for auth, profile, booking lifecycle, dashboards, and cross-app config.
+- `landing-page/frontend`: Public landing experience plus shared login/signup entry routes.
+- `frontend/customer-frontend`: Customer dashboard and booking flows.
+- `frontend/broker-frontend`: Broker dashboard for worker management and commission views.
+- `frontend/worker-frontend`: Worker dashboard for requests, schedule, earnings, and reviews.
 
----
+## Tech Stack
 
-## 🛠️ Tech Stack
+### Backend
+- Node.js
+- Express
+- MongoDB + Mongoose
+- JWT authentication (`jsonwebtoken`)
+- Password hashing (`bcryptjs`)
+- CORS + JSON middleware
+- `dotenv` for environment variables
+- `nodemon` for local development
 
-| Category       | Technology                              |
-| -------------- | --------------------------------------- |
-| **Frontend**   | React, CSS3, Axios                      |
-| **Backend**    | Node.js, Express.js                     |
-| **Database**   | MongoDB with Mongoose                   |
-| **Auth**       | JSON Web Tokens (JWT)                   |
-| **Deployment** | Vercel (Frontend), Heroku/AWS (Backend) |
+### Frontend
+- React 18
+- React Router v6
+- Vite 5
+- Tailwind CSS
+- Axios (role-based frontends)
+- Lucide React icons
 
----
+### Monorepo Tooling
+- npm workspaces (single root install for all packages)
 
-## 📁 Folder Structure
+## Monorepo Structure
 
+```text
+Omni/
+  backend/
+    src/
+      app.js
+      server.js
+      config/db.js
+      routes/
+      models/
+      schemas/
+    package.json
+    .env
+
+  landing-page/
+    frontend/
+      src/
+      package.json
+      vite.config.js
+      .env
+
+  frontend/
+    customer-frontend/
+      src/
+      package.json
+      vite.config.js
+      .env
+    broker-frontend/
+      src/
+      package.json
+      vite.config.js
+      .env
+    worker-frontend/
+      src/
+      package.json
+      vite.config.js
+      .env
+
+  package.json
+  README.md
 ```
-omni/
-├── public/
-│   ├── index.html
-│   ├── favicon.ico
-│   └── manifest.json
-├── src/
-│   ├── components/
-│   │   ├── common/
-│   │   ├── customer/
-│   │   ├── broker/
-│   │   ├── worker/
-│   │   └── landing/
-│   ├── pages/
-│   ├── hooks/
-│   ├── services/
-│   ├── utils/
-│   ├── context/
-│   ├── assets/
-│   ├── App.js
-│   ├── App.css
-│   ├── index.js
-│   └── index.css
-├── package.json
-├── tailwind.config.js
-└── .gitignore
+
+## Port Map
+
+These ports are fixed via each app's Vite/server config:
+
+- Backend API: `5000`
+- Landing frontend: `5173`
+- Customer frontend: `5174`
+- Broker frontend: `5175`
+- Worker frontend: `5176`
+
+## Prerequisites
+
+Install the following first:
+
+1. Node.js `18+` (Node 20 LTS recommended)
+2. npm `9+` (comes with Node)
+3. MongoDB connection string (local MongoDB or MongoDB Atlas)
+
+## Clone and Install
+
+1. Clone from GitHub:
+
+```bash
+git clone https://github.com/Aman-Singh-Kunwar/Omni.git
+cd Omni
 ```
 
----
+2. Install all dependencies from root:
 
-## 📧 Contact
+```bash
+npm install
+```
 
-Aman Singh Kunwar
+Because this repo uses npm workspaces, this single install command sets up backend + all frontends.
 
-- **Email:** amansinghkunwar07@gmail.com
-- **LinkedIn:** [linkedin.com/in/amansinghkunwar](https://linkedin.com/in/amansinghkunwar)
+## Environment Setup (.env)
+
+This project uses separate `.env` files for backend and each frontend app.
+
+### 1) Backend `.env`
+
+Create/edit: `backend/.env`
+
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>/<database>?retryWrites=true&w=majority
+LANDING_APP_URL=http://localhost:5173
+CUSTOMER_APP_URL=http://localhost:5174
+BROKER_APP_URL=http://localhost:5175
+WORKER_APP_URL=http://localhost:5176
+MAIN_API_URL=http://localhost:5000/api
+JWT_SECRET=replace-with-a-strong-secret
+SYNC_INDEXES=true
+```
+
+Variable reference:
+
+- `PORT`: backend HTTP port.
+- `MONGODB_URI`: MongoDB connection URI.
+- `LANDING_APP_URL`: landing app URL returned by `/api/config`.
+- `CUSTOMER_APP_URL`: customer app URL returned by `/api/config`.
+- `BROKER_APP_URL`: broker app URL returned by `/api/config`.
+- `WORKER_APP_URL`: worker app URL returned by `/api/config`.
+- `MAIN_API_URL`: API base URL returned by `/api/config`.
+- `JWT_SECRET`: signing secret for JWT tokens.
+- `SYNC_INDEXES`: optional. If set to `false`, backend skips `mongoose.syncIndexes()` at startup.
+
+### 2) Landing frontend `.env`
+
+Create/edit: `landing-page/frontend/.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+### 3) Customer frontend `.env`
+
+Create/edit: `frontend/customer-frontend/.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_LANDING_APP_URL=http://localhost:5173
+VITE_BROKER_APP_URL=http://localhost:5175
+VITE_WORKER_APP_URL=http://localhost:5176
+```
+
+### 4) Broker frontend `.env`
+
+Create/edit: `frontend/broker-frontend/.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_LANDING_APP_URL=http://localhost:5173
+VITE_CUSTOMER_APP_URL=http://localhost:5174
+VITE_WORKER_APP_URL=http://localhost:5176
+```
+
+### 5) Worker frontend `.env`
+
+Create/edit: `frontend/worker-frontend/.env`
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_LANDING_APP_URL=http://localhost:5173
+VITE_CUSTOMER_APP_URL=http://localhost:5174
+VITE_BROKER_APP_URL=http://localhost:5175
+```
+
+## Run the Project Locally
+
+Open separate terminals (recommended) and run from repo root.
+
+1. Start backend:
+
+```bash
+npm run dev:backend
+```
+
+2. Start landing app:
+
+```bash
+npm run dev:landing:frontend
+```
+
+3. Start customer app:
+
+```bash
+npm run dev:customer
+```
+
+4. Start broker app:
+
+```bash
+npm run dev:broker
+```
+
+5. Start worker app:
+
+```bash
+npm run dev:worker
+```
+
+After startup:
+- Landing: http://localhost:5173
+- Customer: http://localhost:5174
+- Broker: http://localhost:5175
+- Worker: http://localhost:5176
+- API health: http://localhost:5000/api/health
+
+## Build for Production
+
+From root:
+
+```bash
+npm run build
+```
+
+This runs `build` for all workspaces where the script exists.
+
+## Application Workflow
+
+### 1) Config + App Linking
+
+- Landing app calls `GET /api/config`.
+- Backend returns role app URLs and main API URL from backend env.
+- Landing uses those values for role redirects.
+
+### 2) Authentication Flow
+
+- Signup/login endpoints:
+  - `POST /api/auth/signup`
+  - `POST /api/auth/login`
+- On success, backend returns user + JWT token.
+- Role apps verify token using `GET /api/auth/me`.
+- Session is stored in localStorage per role app.
+
+### 3) Cross-Role Navigation
+
+- Landing provides role-based entry points.
+- Role apps support dedicated `/login` and `/signup` routes.
+- If a user is unauthenticated, interactive actions route to login pages.
+- Role switching is supported via `POST /api/auth/switch-role`.
+
+### 4) Booking Lifecycle (high level)
+
+1. Customer creates booking (`POST /api/bookings`).
+2. Matching workers see pending requests.
+3. Worker accepts/rejects (`PATCH /api/worker/bookings/:bookingId`).
+4. Customer can cancel within a 10-minute window.
+5. Completed jobs can be paid/reviewed by customer.
+6. Broker commission and worker net values are computed by backend helpers.
+
+### 5) Broker-Worker Linking
+
+- Broker accounts have a generated 6-char broker code.
+- Worker profile can attach to broker via broker code.
+- Broker dashboards aggregate linked worker data and completed booking commissions.
+
+## API Overview
+
+Main route prefix: `/api`
+
+Core routes:
+
+- Health/config:
+  - `GET /health`
+  - `GET /config`
+
+- Auth:
+  - `POST /auth/signup`
+  - `POST /auth/login`
+  - `GET /auth/me`
+  - `POST /auth/switch-role`
+
+- Profile:
+  - `GET /profile`
+  - `PUT /profile`
+
+- Catalog:
+  - `GET /services`
+  - `GET /workers/available`
+
+- Customer:
+  - `GET /customer/dashboard`
+  - `POST /bookings`
+  - `PATCH /customer/bookings/:bookingId/cancel`
+  - `DELETE /customer/bookings/:bookingId`
+  - `PATCH /customer/bookings/:bookingId/not-provided`
+  - `PATCH /customer/bookings/:bookingId/pay`
+  - `PATCH /customer/bookings/:bookingId/review`
+
+- Broker:
+  - `GET /broker/dashboard`
+  - `GET /broker/workers`
+  - `GET /broker/bookings`
+
+- Worker:
+  - `GET /worker/dashboard`
+  - `GET /worker/reviews`
+  - `PATCH /worker/bookings/:bookingId`
+
+## Data Model Overview
+
+### User
+- Single user collection with role-based profiles:
+  - `customerProfile`
+  - `brokerProfile` (includes `brokerCode`)
+  - `workerProfile` (includes `servicesProvided`, availability, broker link)
+- Unique index on `(email, role)`.
+
+### Booking
+- Stores customer, worker, broker linkage, service/time details, pricing, status, rating/feedback.
+- Status values include:
+  - `pending`, `confirmed`, `in-progress`, `completed`, `cancelled`, `upcoming`, `failed`, `not-provided`
+
+### Service
+- Catalog service documents with base price, category, provider count, and rating.
+
+## Troubleshooting
+
+### Port already in use
+
+- Vite servers use `strictPort: true`, so startup fails if taken.
+- Free the conflicting process or update the port in:
+  - `landing-page/frontend/vite.config.js`
+  - `frontend/customer-frontend/vite.config.js`
+  - `frontend/broker-frontend/vite.config.js`
+  - `frontend/worker-frontend/vite.config.js`
+
+### Backend starts but DB is not connected
+
+- Verify `MONGODB_URI` in `backend/.env`.
+- If missing, API runs but without DB-backed features.
+
+### JWT or auth errors
+
+- Ensure `JWT_SECRET` is set and stable while server is running.
+- Clear localStorage in browser if using old tokens.
+
+### CORS/API URL issues
+
+- Confirm `VITE_API_URL` values point to `http://localhost:5000/api`.
+- Confirm backend is running before opening frontends.
+
+### Empty dashboards
+
+- This is expected for new databases with no seed data.
+- Create users and bookings via UI flows first.
+
+## Security Notes
+
+- Do not commit production secrets to Git.
+- Use a strong, unique `JWT_SECRET` per environment.
+- Use separate MongoDB users/databases for dev, staging, and production.
+- Rotate any credential that has ever been committed publicly.
+
+## Root Scripts
+
+From `package.json`:
+
+- `npm run dev:backend`
+- `npm run dev:landing:frontend`
+- `npm run dev:customer`
+- `npm run dev:broker`
+- `npm run dev:worker`
+- `npm run build`

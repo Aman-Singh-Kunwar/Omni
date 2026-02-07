@@ -1,54 +1,19 @@
 {
-  "homepage": "https://Aman-Singh-kunwar.github.io/Omni",
   "name": "omni",
-  "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.8.0",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
-    "axios": "^1.11.0",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.542.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "react-hook-form": "^7.62.0",
-    "react-router-dom": "^7.8.2",
-    "react-scripts": "5.0.1",
-    "tailwindcss": "^4.1.13",
-    "web-vitals": "^2.1.4"
-  },
+  "workspaces": [
+    "backend",
+    "landing-page/frontend",
+    "frontend/customer-frontend",
+    "frontend/broker-frontend",
+    "frontend/worker-frontend"
+  ],
   "scripts": {
-    "start": "react-scripts start",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "devDependencies": {
-    "autoprefixer": "^10.4.21",
-    "gh-pages": "^6.3.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17"
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:landing:frontend": "npm run dev --workspace landing-page/frontend",
+    "dev:customer": "npm run dev --workspace frontend/customer-frontend",
+    "dev:broker": "npm run dev --workspace frontend/broker-frontend",
+    "dev:worker": "npm run dev --workspace frontend/worker-frontend",
+    "build": "npm run build --workspaces --if-present"
   }
 }
