@@ -1,13 +1,11 @@
-const express = require("express");
-
-const authRoutes = require("./auth");
-const brokerRoutes = require("./broker");
-const catalogRoutes = require("./catalog");
-const customerRoutes = require("./customer");
-const healthRoutes = require("./health");
-const profileRoutes = require("./profile");
-const workerRoutes = require("./worker");
-
+import express from "express";
+import authRoutes from "./auth.js";
+import brokerRoutes from "./broker.js";
+import catalogRoutes from "./catalog.js";
+import customerRoutes from "./customer.js";
+import healthRoutes from "./health.js";
+import profileRoutes from "./profile.js";
+import workerRoutes from "./worker.js";
 const router = express.Router();
 
 router.use(healthRoutes);
@@ -18,4 +16,4 @@ router.use(customerRoutes);
 router.use(brokerRoutes);
 router.use(workerRoutes);
 
-module.exports = router;
+export default router;

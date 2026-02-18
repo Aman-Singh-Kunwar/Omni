@@ -1,5 +1,4 @@
-const express = require("express");
-
+import express from "express";
 const router = express.Router();
 
 router.get("/health", (_req, res) => {
@@ -24,4 +23,4 @@ router.get("/config", (_req, res) => {
   });
 });
 
-module.exports = router;
+export default router;

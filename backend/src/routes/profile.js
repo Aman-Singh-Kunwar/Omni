@@ -1,14 +1,75 @@
-const express = require("express");
-
-const User = require("../models/User");
-const { PROFILE_PATH_BY_ROLE, buildProfileUpdate, toProfileDto } = require("../schemas/profile");
-const { findBrokerByCode, requireAuth, safeNormalizeBrokerCode, toAuthUser } = require("./helpers");
-
+import express from "express";
+import User from "../models/User.js";
+import { PROFILE_PATH_BY_ROLE, buildProfileUpdate, toProfileDto } from "../schemas/profile.js";
+import {
+  findBrokerByCode,
+  getLinkedBrokerForWorker,
+  getWorkerBrokerCommissionProgress,
+  requireAuth,
+  safeNormalizeBrokerCode,
+  toAuthUser
+} from "./helpers.js";
+import { normalizeEmail, syncUserFamilyByEmail } from "../utils/userSync.js";
 const router = express.Router();
+
+async function enrichWorkerProfile(user, profile = {}) {
+  const linkedBroker = await getLinkedBrokerForWorker(user);
+  const brokerCode = profile.brokerCode || linkedBroker?.code || "";
+  const brokerId = linkedBroker?.id ? String(linkedBroker.id) : user?.workerProfile?.brokerId ? String(user.workerProfile.brokerId) : "";
+  const brokerName = linkedBroker?.name || "";
+  return {
+    ...profile,
+    brokerCode,
+    brokerId,
+    brokerName,
+    brokerCodeLocked: Boolean(brokerCode || brokerId)
+  };
+}
+
+async function ensureEmailCanMoveForFamily(currentUser, nextEmail) {
+  const currentEmail = normalizeEmail(currentUser?.email);
+  const targetEmail = normalizeEmail(nextEmail);
+  if (!currentEmail || !targetEmail || currentEmail === targetEmail) {
+    return;
+  }
+
+  const family = await User.find({ email: currentEmail }).select({ _id: 1, role: 1 }).lean();
+  const familyIds = new Set(family.map((item) => String(item._id)));
+  familyIds.add(String(currentUser._id));
+  const familyRoles = [...new Set(family.map((item) => item.role).filter(Boolean))];
+  if (!familyRoles.includes(currentUser.role)) {
+    familyRoles.push(currentUser.role);
+  }
+
+  const conflicts = await User.find({
+    email: targetEmail,
+    role: { $in: familyRoles },
+    _id: { $nin: [...familyIds] }
+  })
+    .select({ _id: 1, role: 1 })
+    .lean();
+
+  if (conflicts.length) {
+    const error = new Error("Email already registered for this role.");
+    error.statusCode = 409;
+    throw error;
+  }
+}
 
 router.get("/profile", requireAuth, async (req, res, next) => {
   try {
-    return res.json(toProfileDto(req.authUser));
+    const payload = toProfileDto(req.authUser);
+    if (req.authUser.role === "worker") {
+      const enrichedProfile = await enrichWorkerProfile(req.authUser, payload.profile);
+      const progress = await getWorkerBrokerCommissionProgress(req.authUser);
+      payload.profile = {
+        ...enrichedProfile,
+        brokerCommissionJobsUsed: progress.usedJobs,
+        brokerCommissionJobsLimit: progress.jobLimit,
+        brokerCommissionUsage: progress.usageLabel
+      };
+    }
+    return res.json(payload);
   } catch (error) {
     return next(error);
   }
@@ -16,6 +77,7 @@ router.get("/profile", requireAuth, async (req, res, next) => {
 
 router.put("/profile", requireAuth, async (req, res, next) => {
   try {
+    const oldEmail = req.authUser.email;
     const payload = req.body || {};
     const name = typeof payload.name === "string" ? payload.name.trim() : "";
     const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
@@ -35,6 +97,8 @@ router.put("/profile", requireAuth, async (req, res, next) => {
         return res.status(409).json({ message: "Email already registered for this role." });
       }
 
+      await ensureEmailCanMoveForFamily(req.authUser, email);
+
       req.authUser.email = email;
     }
 
@@ -46,14 +110,37 @@ router.put("/profile", requireAuth, async (req, res, next) => {
     const updates = buildProfileUpdate(req.authUser.role, payload);
 
     if (req.authUser.role === "worker") {
+      const existingBrokerCode = safeNormalizeBrokerCode(req.authUser.workerProfile?.brokerCode);
+      const existingBrokerId = req.authUser.workerProfile?.brokerId ? String(req.authUser.workerProfile.brokerId) : "";
       const requestedBrokerCode = safeNormalizeBrokerCode(updates.brokerCode);
-      if (requestedBrokerCode) {
+      const hasExistingBrokerLink = Boolean(existingBrokerCode || existingBrokerId);
+
+      if (existingBrokerCode && requestedBrokerCode && requestedBrokerCode !== existingBrokerCode) {
+        return res.status(409).json({ message: "Broker code cannot be edited once linked." });
+      }
+
+      if (hasExistingBrokerLink) {
+        if (existingBrokerId && requestedBrokerCode && !existingBrokerCode) {
+          const requestedBroker = await findBrokerByCode(requestedBrokerCode);
+          if (!requestedBroker || String(requestedBroker.id) !== existingBrokerId) {
+            return res.status(409).json({ message: "Broker code cannot be edited once linked." });
+          }
+          updates.brokerCode = requestedBroker.code;
+          updates.brokerId = existingBrokerId;
+        } else {
+          updates.brokerCode = existingBrokerCode || updates.brokerCode || "";
+          updates.brokerId = existingBrokerId || req.authUser.workerProfile?.brokerId;
+        }
+      } else if (requestedBrokerCode) {
         const linkedBroker = await findBrokerByCode(requestedBrokerCode);
         if (!linkedBroker) {
           return res.status(404).json({ message: "Broker not found for the provided broker code." });
         }
         updates.brokerCode = linkedBroker.code;
         updates.brokerId = linkedBroker.id;
+      } else if (existingBrokerCode) {
+        updates.brokerCode = existingBrokerCode;
+        updates.brokerId = req.authUser.workerProfile?.brokerId;
       } else {
         updates.brokerCode = "";
         updates.brokerId = undefined;
@@ -69,9 +156,22 @@ router.put("/profile", requireAuth, async (req, res, next) => {
     });
 
     await req.authUser.save();
+    await syncUserFamilyByEmail(req.authUser, { oldEmail });
+
+    const payloadResponse = toProfileDto(req.authUser);
+    if (req.authUser.role === "worker") {
+      const enrichedProfile = await enrichWorkerProfile(req.authUser, payloadResponse.profile);
+      const progress = await getWorkerBrokerCommissionProgress(req.authUser);
+      payloadResponse.profile = {
+        ...enrichedProfile,
+        brokerCommissionJobsUsed: progress.usedJobs,
+        brokerCommissionJobsLimit: progress.jobLimit,
+        brokerCommissionUsage: progress.usageLabel
+      };
+    }
 
     return res.json({
-      ...toProfileDto(req.authUser),
+      ...payloadResponse,
       user: toAuthUser(req.authUser)
     });
   } catch (error) {
@@ -82,4 +182,4 @@ router.put("/profile", requireAuth, async (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

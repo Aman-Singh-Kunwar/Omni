@@ -1,23 +1,28 @@
-const mongoose = require("mongoose");
-
+import mongoose from "mongoose";
+import logger from "../utils/logger.js";
 async function connectMongo() {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    console.warn("MONGODB_URI not set. API will run without a MongoDB connection.");
+    logger.warnOnce("mongo_uri_missing", "MONGODB_URI not set. API will run without a MongoDB connection.");
     return;
   }
 
   try {
+    logger.infoOnce("mongo_connecting", "Connecting to MongoDB");
     await mongoose.connect(uri);
     if (process.env.SYNC_INDEXES !== "false") {
+      logger.infoOnce("mongo_sync_indexes", "Running mongoose syncIndexes");
       await mongoose.syncIndexes();
     }
-    console.log("MongoDB connected");
+    logger.infoOnce("mongo_connected", "MongoDB connected");
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
+    logger.errorOnce(`mongo_connection_failed:${error?.message || "unknown"}`, "MongoDB connection failed", {
+      message: error?.message || "Unknown MongoDB error",
+      stack: error?.stack
+    });
     process.exit(1);
   }
 }
 
-module.exports = connectMongo;
+export default connectMongo;

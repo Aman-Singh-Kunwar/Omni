@@ -104,6 +104,26 @@ function App() {
     setAuthSession(session);
   };
 
+  const handleLogout = async () => {
+    try {
+      if (authToken) {
+        await api.post(
+          "/auth/logout",
+          {},
+          {
+            headers: { Authorization: `Bearer ${authToken}` }
+          }
+        );
+      }
+    } catch (_error) {
+      // Ignore logout API errors and continue client-side logout.
+    } finally {
+      clearSession();
+      setAuthSession(null);
+      navigate("/login");
+    }
+  };
+
   if (checking) {
     return <div className="flex min-h-screen items-center justify-center bg-purple-50 text-slate-600">Checking login...</div>;
   }
@@ -143,11 +163,7 @@ function App() {
                 userName={authUser?.name || "Guest"}
                 userEmail={authUser?.email || ""}
                 authToken={authToken}
-                onLogout={() => {
-                  clearSession();
-                  setAuthSession(null);
-                  navigate("/login");
-                }}
+                onLogout={handleLogout}
               />
             </div>
           }

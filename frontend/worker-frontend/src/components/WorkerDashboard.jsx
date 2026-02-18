@@ -72,6 +72,9 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     phone: "",
     servicesProvided: "",
     brokerCode: "",
+    brokerName: "",
+    brokerCodeLocked: false,
+    brokerCommissionUsage: "0/10",
     isAvailable: true
   });
   const [profileStatus, setProfileStatus] = useState({ loading: false, error: "", success: "" });
@@ -313,6 +316,9 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
       phone: "",
       servicesProvided: "",
       brokerCode: "",
+      brokerName: "",
+      brokerCodeLocked: false,
+      brokerCommissionUsage: "0/10",
       isAvailable: true
     };
 
@@ -338,6 +344,9 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
           phone: profile.phone || "",
           servicesProvided: Array.isArray(profile.servicesProvided) ? profile.servicesProvided.join(", ") : "",
           brokerCode: profile.brokerCode || "",
+          brokerName: profile.brokerName || "",
+          brokerCodeLocked: profile.brokerCodeLocked === true,
+          brokerCommissionUsage: profile.brokerCommissionUsage || "0/10",
           isAvailable: profile.isAvailable !== false
         });
       } catch (_error) {
@@ -471,6 +480,9 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
         phone: profile.phone || "",
         servicesProvided: Array.isArray(profile.servicesProvided) ? profile.servicesProvided.join(", ") : "",
         brokerCode: profile.brokerCode || "",
+        brokerName: profile.brokerName || "",
+        brokerCodeLocked: profile.brokerCodeLocked === true,
+        brokerCommissionUsage: profile.brokerCommissionUsage || prev.brokerCommissionUsage || "0/10",
         isAvailable: profile.isAvailable !== false
       }));
       setProfileStatus({ loading: false, error: "", success: "Profile updated." });

@@ -1,5 +1,4 @@
-const mongoose = require("mongoose");
-
+import mongoose from "mongoose";
 function normalizeString(value) {
   if (typeof value !== "string") {
     return "";
@@ -33,4 +32,4 @@ providerSchema.pre("validate", function preValidateProvider(next) {
 providerSchema.index({ service: 1, rating: -1 });
 providerSchema.index({ name: 1, service: 1 });
 
-module.exports = mongoose.model("Provider", providerSchema);
+export default mongoose.model("Provider", providerSchema);

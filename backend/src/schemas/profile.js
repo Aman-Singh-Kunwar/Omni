@@ -89,7 +89,8 @@ function toProfileDto(user) {
             ...commonProfile,
             servicesProvided: Array.isArray(roleProfile.servicesProvided) ? roleProfile.servicesProvided : [],
             isAvailable: Boolean(roleProfile.isAvailable),
-            brokerCode: roleProfile.brokerCode || ""
+            brokerCode: roleProfile.brokerCode || "",
+            brokerCodeLocked: Boolean(roleProfile.brokerCode || roleProfile.brokerId)
           }
         : user.role === "broker"
           ? {
@@ -154,7 +155,7 @@ function toAvailableWorkerDto(user, bookingSummary = { completedJobs: 0, average
   };
 }
 
-module.exports = {
+export {
   PROFILE_PATH_BY_ROLE,
   toProfileDto,
   buildProfileUpdate,

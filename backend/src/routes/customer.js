@@ -1,27 +1,8 @@
-const express = require("express");
-
-const Booking = require("../models/Booking");
-const Service = require("../models/Service");
-const User = require("../models/User");
-const {
-  BROKER_COMMISSION_RATE_PERCENT,
-  CUSTOMER_CANCELLABLE_STATUSES,
-  CUSTOMER_CANCEL_WINDOW_MS,
-  CUSTOMER_NOT_PROVIDED_ELIGIBLE_STATUSES,
-  CUSTOMER_PAYMENT_ELIGIBLE_STATUSES,
-  CUSTOMER_REVIEW_ELIGIBLE_STATUSES,
-  bookingAssignedToWorker,
-  bookingHasAssignedWorker,
-  calculateBrokerCommissionAmount,
-  ensureBookingBrokerAttribution,
-  expireTimedOutPendingBookings,
-  getAvailableWorkers,
-  isLikelyObjectId,
-  readAuthUserFromRequest,
-  requireAuth,
-  workerProvidesService
-} = require("./helpers");
-
+import express from "express";
+import Booking from "../models/Booking.js";
+import Service from "../models/Service.js";
+import User from "../models/User.js";
+import { BROKER_COMMISSION_RATE_PERCENT, CUSTOMER_CANCELLABLE_STATUSES, CUSTOMER_CANCEL_WINDOW_MS, CUSTOMER_NOT_PROVIDED_ELIGIBLE_STATUSES, CUSTOMER_PAYMENT_ELIGIBLE_STATUSES, CUSTOMER_REVIEW_ELIGIBLE_STATUSES, bookingAssignedToWorker, bookingHasAssignedWorker, calculateBrokerCommissionAmount, ensureBookingBrokerAttribution, expireTimedOutPendingBookings, findAssignedWorkerForBooking, getAvailableWorkers, getWorkerBrokerCommissionProgress, isLikelyObjectId, readAuthUserFromRequest, requireAuth, safeNormalizeBrokerCode, workerProvidesService } from "./helpers.js";
 const router = express.Router();
 
 router.get("/customer/dashboard", async (req, res, next) => {
@@ -65,9 +46,16 @@ router.get("/customer/dashboard", async (req, res, next) => {
 
     const workerIds = [...new Set(bookings.map((booking) => booking.workerId).filter(Boolean).map((value) => String(value)))];
     const workerNames = [...new Set(bookings.map((booking) => booking.workerName).filter(Boolean))];
+    const workerEmails = [
+      ...new Set(
+        bookings
+          .map((booking) => String(booking.workerEmail || "").trim().toLowerCase())
+          .filter(Boolean)
+      )
+    ];
     const workerQuery = { role: "worker" };
 
-    if (workerIds.length || workerNames.length) {
+    if (workerIds.length || workerNames.length || workerEmails.length) {
       workerQuery.$or = [];
       if (workerIds.length) {
         workerQuery.$or.push({ _id: { $in: workerIds } });
@@ -75,9 +63,12 @@ router.get("/customer/dashboard", async (req, res, next) => {
       if (workerNames.length) {
         workerQuery.$or.push({ name: { $in: workerNames } });
       }
+      if (workerEmails.length) {
+        workerQuery.$or.push({ email: { $in: workerEmails } });
+      }
     }
 
-    const workers = workerIds.length || workerNames.length ? await User.find(workerQuery).lean() : [];
+    const workers = workerIds.length || workerNames.length || workerEmails.length ? await User.find(workerQuery).lean() : [];
     const workerById = new Map(workers.map((worker) => [String(worker._id), worker]));
     const workerByName = new Map(workers.map((worker) => [worker.name, worker]));
 
@@ -343,13 +334,27 @@ router.patch("/customer/bookings/:bookingId/pay", requireAuth, async (req, res, 
     }
 
     await ensureBookingBrokerAttribution(booking);
+    const assignedWorker = await findAssignedWorkerForBooking(booking);
+    const workerHasLinkedBroker = Boolean(
+      (assignedWorker?.workerProfile?.brokerId && String(assignedWorker.workerProfile.brokerId).trim()) ||
+        safeNormalizeBrokerCode(assignedWorker?.workerProfile?.brokerCode)
+    );
+    let commissionRate = 0;
+    if (workerHasLinkedBroker) {
+      const progress = await getWorkerBrokerCommissionProgress(assignedWorker);
+      commissionRate = progress.isLimitReached ? 0 : BROKER_COMMISSION_RATE_PERCENT;
+    }
+
     booking.status = "completed";
-    booking.brokerCommissionRate = BROKER_COMMISSION_RATE_PERCENT;
-    booking.brokerCommissionAmount = calculateBrokerCommissionAmount({
-      ...booking.toObject(),
-      brokerCommissionAmount: undefined,
-      brokerCommissionRate: BROKER_COMMISSION_RATE_PERCENT
-    });
+    booking.brokerCommissionRate = commissionRate;
+    booking.brokerCommissionAmount =
+      commissionRate > 0
+        ? calculateBrokerCommissionAmount({
+            ...booking.toObject(),
+            brokerCommissionAmount: undefined,
+            brokerCommissionRate: commissionRate
+          })
+        : 0;
     await booking.save();
 
     return res.json({ booking });
@@ -407,4 +412,4 @@ router.patch("/customer/bookings/:bookingId/review", requireAuth, async (req, re
   }
 });
 
-module.exports = router;
+export default router;

@@ -1,5 +1,4 @@
-const mongoose = require("mongoose");
-
+import mongoose from "mongoose";
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
 const DEFAULT_BROKER_COMMISSION_RATE = 5;
 
@@ -117,74 +116,68 @@ const bookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-bookingSchema.pre("validate", async function preValidateBooking(next) {
-  try {
-    this.service = normalizeString(this.service);
-    this.customerName = normalizeString(this.customerName);
-    this.workerName = normalizeString(this.workerName);
-    this.workerEmail = normalizeString(this.workerEmail).toLowerCase();
-    this.workerPhone = normalizeString(this.workerPhone);
-    this.workerServices = normalizeWorkerServices(this.workerServices);
-    this.brokerName = normalizeString(this.brokerName) || "Omni Broker";
-    this.brokerCode = normalizeBrokerCode(this.brokerCode);
-    this.location = normalizeString(this.location);
-    this.description = normalizeString(this.description);
-    this.date = normalizeString(this.date);
-    this.time = normalizeString(this.time);
+bookingSchema.pre("validate", async function preValidateBooking() {
+  this.service = normalizeString(this.service);
+  this.customerName = normalizeString(this.customerName);
+  this.workerName = normalizeString(this.workerName);
+  this.workerEmail = normalizeString(this.workerEmail).toLowerCase();
+  this.workerPhone = normalizeString(this.workerPhone);
+  this.workerServices = normalizeWorkerServices(this.workerServices);
+  this.brokerName = normalizeString(this.brokerName) || "Omni Broker";
+  this.brokerCode = normalizeBrokerCode(this.brokerCode);
+  this.location = normalizeString(this.location);
+  this.description = normalizeString(this.description);
+  this.date = normalizeString(this.date);
+  this.time = normalizeString(this.time);
 
-    const UserModel = mongoose.models.User;
-    if (UserModel && this.brokerCode && !this.brokerId) {
-      const broker = await UserModel.findOne({
-        role: "broker",
-        "brokerProfile.brokerCode": this.brokerCode
-      })
-        .select({ _id: 1, name: 1 })
-        .lean();
-      if (broker) {
-        this.brokerId = broker._id;
-        this.brokerName = broker.name || this.brokerName;
-      }
+  const UserModel = mongoose.models.User;
+  if (UserModel && this.brokerCode && !this.brokerId) {
+    const broker = await UserModel.findOne({
+      role: "broker",
+      "brokerProfile.brokerCode": this.brokerCode
+    })
+      .select({ _id: 1, name: 1 })
+      .lean();
+    if (broker) {
+      this.brokerId = broker._id;
+      this.brokerName = broker.name || this.brokerName;
     }
+  }
 
-    if (UserModel && this.brokerId && !this.brokerCode) {
-      const broker = await UserModel.findOne({
-        _id: this.brokerId,
-        role: "broker"
-      })
-        .select({ name: 1, brokerProfile: 1 })
-        .lean();
-      if (broker) {
-        this.brokerCode = normalizeBrokerCode(broker.brokerProfile?.brokerCode);
-        this.brokerName = broker.name || this.brokerName;
-      }
+  if (UserModel && this.brokerId && !this.brokerCode) {
+    const broker = await UserModel.findOne({
+      _id: this.brokerId,
+      role: "broker"
+    })
+      .select({ name: 1, brokerProfile: 1 })
+      .lean();
+    if (broker) {
+      this.brokerCode = normalizeBrokerCode(broker.brokerProfile?.brokerCode);
+      this.brokerName = broker.name || this.brokerName;
     }
+  }
 
-    const totalAmount = getBookingTotalAmount(this);
-    this.originalAmount = totalAmount;
+  const totalAmount = getBookingTotalAmount(this);
+  this.originalAmount = totalAmount;
 
-    this.discountPercent = clampPercent(this.discountPercent);
-    this.discountAmount = roundInr(totalAmount * (this.discountPercent / 100));
-    this.amount = Math.max(0, roundInr(totalAmount - this.discountAmount));
+  this.discountPercent = clampPercent(this.discountPercent);
+  this.discountAmount = roundInr(totalAmount * (this.discountPercent / 100));
+  this.amount = Math.max(0, roundInr(totalAmount - this.discountAmount));
 
-    this.brokerCommissionRate = clampPercent(
-      Number.isFinite(Number(this.brokerCommissionRate)) ? this.brokerCommissionRate : DEFAULT_BROKER_COMMISSION_RATE
-    );
-    if (this.status === "completed" && hasLinkedBroker(this)) {
-      this.brokerCommissionAmount = roundInr(totalAmount * (this.brokerCommissionRate / 100));
-    } else if (!hasLinkedBroker(this)) {
-      this.brokerCommissionAmount = 0;
-    } else {
-      this.brokerCommissionAmount = Math.max(0, roundInr(this.brokerCommissionAmount));
-    }
+  this.brokerCommissionRate = clampPercent(
+    Number.isFinite(Number(this.brokerCommissionRate)) ? this.brokerCommissionRate : DEFAULT_BROKER_COMMISSION_RATE
+  );
+  if (this.status === "completed" && hasLinkedBroker(this)) {
+    this.brokerCommissionAmount = roundInr(totalAmount * (this.brokerCommissionRate / 100));
+  } else if (!hasLinkedBroker(this)) {
+    this.brokerCommissionAmount = 0;
+  } else {
+    this.brokerCommissionAmount = Math.max(0, roundInr(this.brokerCommissionAmount));
+  }
 
-    if (this.rating !== undefined && this.rating !== null) {
-      const numericRating = Number(this.rating);
-      this.rating = Number.isFinite(numericRating) ? numericRating : undefined;
-    }
-
-    return next();
-  } catch (error) {
-    return next(error);
+  if (this.rating !== undefined && this.rating !== null) {
+    const numericRating = Number(this.rating);
+    this.rating = Number.isFinite(numericRating) ? numericRating : undefined;
   }
 });
 
@@ -195,4 +188,4 @@ bookingSchema.index({ workerName: 1, createdAt: -1 });
 bookingSchema.index({ brokerId: 1, status: 1, createdAt: -1 });
 bookingSchema.index({ brokerCode: 1, status: 1, createdAt: -1 });
 
-module.exports = mongoose.model("Booking", bookingSchema);
+export default mongoose.model("Booking", bookingSchema);

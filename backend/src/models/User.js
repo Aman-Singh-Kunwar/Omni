@@ -1,5 +1,4 @@
-const mongoose = require("mongoose");
-
+import mongoose from "mongoose";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
 const BROKER_CODE_LENGTH = 6;
@@ -26,8 +25,18 @@ function normalizeServicesProvided(services) {
   return [...new Set(services.map((item) => normalizeString(item)).filter(Boolean))];
 }
 
+function toPlainProfile(profile = {}) {
+  if (!profile || typeof profile !== "object") {
+    return {};
+  }
+  if (typeof profile.toObject === "function") {
+    return profile.toObject();
+  }
+  return { ...profile };
+}
+
 function normalizeRoleProfileCommon(profile = {}) {
-  const next = typeof profile === "object" && profile !== null ? { ...profile } : {};
+  const next = toPlainProfile(profile);
   const gender = normalizeString(next.gender).toLowerCase();
   next.bio = normalizeString(next.bio);
   next.phone = normalizeString(next.phone);
@@ -146,49 +155,56 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.pre("validate", async function preValidateUser(next) {
-  try {
-    this.name = normalizeString(this.name);
-    this.email = normalizeString(this.email).toLowerCase();
+userSchema.pre("validate", async function preValidateUser() {
+  this.name = normalizeString(this.name);
+  this.email = normalizeString(this.email).toLowerCase();
 
-    this.customerProfile = normalizeRoleProfileCommon(this.customerProfile);
-    this.brokerProfile = normalizeRoleProfileCommon(this.brokerProfile);
-    this.workerProfile = normalizeRoleProfileCommon(this.workerProfile);
+  this.customerProfile = normalizeRoleProfileCommon(this.customerProfile);
+  this.brokerProfile = normalizeRoleProfileCommon(this.brokerProfile);
+  this.workerProfile = normalizeRoleProfileCommon(this.workerProfile);
 
-    this.workerProfile.servicesProvided = normalizeServicesProvided(this.workerProfile.servicesProvided);
-    this.workerProfile.brokerCode = normalizeBrokerCode(this.workerProfile.brokerCode);
+  this.workerProfile.servicesProvided = normalizeServicesProvided(this.workerProfile.servicesProvided);
+  this.workerProfile.brokerCode = normalizeBrokerCode(this.workerProfile.brokerCode);
 
-    const UserModel = this.constructor;
-    if (this.role === "broker") {
-      const existingBrokerCode = normalizeBrokerCode(this.brokerProfile.brokerCode);
-      this.brokerProfile.brokerCode = existingBrokerCode || (await generateUniqueBrokerCode(UserModel, this._id));
-    } else if (!normalizeBrokerCode(this.brokerProfile.brokerCode)) {
-      this.brokerProfile.brokerCode = undefined;
-    }
+  const UserModel = this.constructor;
+  if (this.role === "broker") {
+    const existingBrokerCode = normalizeBrokerCode(this.brokerProfile.brokerCode);
+    this.brokerProfile.brokerCode = existingBrokerCode || (await generateUniqueBrokerCode(UserModel, this._id));
+  } else if (!normalizeBrokerCode(this.brokerProfile.brokerCode)) {
+    this.brokerProfile.brokerCode = undefined;
+  }
 
-    if (this.role === "worker") {
-      if (this.workerProfile.brokerCode) {
-        const broker = await UserModel.findOne({
-          role: "broker",
-          "brokerProfile.brokerCode": this.workerProfile.brokerCode
-        })
-          .select({ _id: 1 })
-          .lean();
-        if (!broker) {
-          this.invalidate("workerProfile.brokerCode", "Broker code does not match any broker.");
-        } else {
-          this.workerProfile.brokerId = broker._id;
-        }
+  if (this.role === "worker") {
+    if (this.workerProfile.brokerCode) {
+      const broker = await UserModel.findOne({
+        role: "broker",
+        "brokerProfile.brokerCode": this.workerProfile.brokerCode
+      })
+        .select({ _id: 1 })
+        .lean();
+      if (!broker) {
+        this.invalidate("workerProfile.brokerCode", "Broker code does not match any broker.");
       } else {
-        this.workerProfile.brokerId = undefined;
+        this.workerProfile.brokerId = broker._id;
       }
-    } else if (!this.workerProfile.brokerCode) {
+    } else if (this.workerProfile.brokerId) {
+      const broker = await UserModel.findOne({
+        _id: this.workerProfile.brokerId,
+        role: "broker"
+      })
+        .select({ _id: 1, brokerProfile: 1 })
+        .lean();
+      if (!broker) {
+        this.invalidate("workerProfile.brokerId", "Broker link does not match any broker.");
+        this.workerProfile.brokerId = undefined;
+      } else {
+        this.workerProfile.brokerCode = normalizeBrokerCode(broker.brokerProfile?.brokerCode);
+      }
+    } else {
       this.workerProfile.brokerId = undefined;
     }
-
-    return next();
-  } catch (error) {
-    return next(error);
+  } else if (!this.workerProfile.brokerCode) {
+    this.workerProfile.brokerId = undefined;
   }
 });
 
@@ -198,4 +214,4 @@ userSchema.index({ "brokerProfile.brokerCode": 1 }, { unique: true, sparse: true
 userSchema.index({ role: 1, "workerProfile.brokerCode": 1 });
 userSchema.index({ role: 1, "workerProfile.brokerId": 1 });
 
-module.exports = mongoose.model("User", userSchema);
+export default mongoose.model("User", userSchema);

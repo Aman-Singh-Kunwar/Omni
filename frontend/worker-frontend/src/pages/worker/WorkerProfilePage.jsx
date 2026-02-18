@@ -118,17 +118,30 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
               <input
                 type="text"
                 value={profileForm.brokerCode}
+                disabled={profileForm.brokerCodeLocked}
                 onChange={(event) =>
                   setProfileForm((prev) => ({
                     ...prev,
                     brokerCode: event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80 uppercase tracking-widest"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80 uppercase tracking-widest disabled:bg-gray-100 disabled:text-gray-500"
                 placeholder="Enter 6-character broker code"
                 maxLength={6}
               />
-              <p className="mt-1 text-xs text-gray-500">Use your broker's 6-character code to link your profile.</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {profileForm.brokerCodeLocked
+                  ? "Broker code is locked after linking."
+                  : "Use your broker's 6-character code to link your profile."}
+              </p>
+              {profileForm.brokerName && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Linked broker: <span className="font-semibold">{profileForm.brokerName}</span>
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-600">
+                Broker commission usage: <span className="font-semibold">{profileForm.brokerCommissionUsage || "0/10"}</span>
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Services You Provide</label>

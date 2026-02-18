@@ -1,9 +1,7 @@
-const jwt = require("jsonwebtoken");
-
-const Booking = require("../models/Booking");
-const User = require("../models/User");
-const { toAvailableWorkerDto, toProfileDto, normalizeBrokerCode } = require("../schemas/profile");
-
+import jwt from "jsonwebtoken";
+import Booking from "../models/Booking.js";
+import User from "../models/User.js";
+import { toAvailableWorkerDto, toProfileDto, normalizeBrokerCode } from "../schemas/profile.js";
 const JWT_SECRET = process.env.JWT_SECRET || "omni-dev-secret";
 const JWT_EXPIRES_IN = "7d";
 const CUSTOMER_CANCEL_WINDOW_MS = 10 * 60 * 1000;
@@ -14,6 +12,7 @@ const CUSTOMER_REVIEW_ELIGIBLE_STATUSES = new Set(["confirmed", "in-progress", "
 const BROKER_CODE_LENGTH = 6;
 const BROKER_CODE_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const BROKER_COMMISSION_RATE_PERCENT = 5;
+const WORKER_BROKER_COMMISSION_JOB_LIMIT = 10;
 const ACTIVE_BOOKING_STATUSES = new Set(["pending", "in-progress", "confirmed", "upcoming"]);
 
 function normalizeForCompare(value) {
@@ -156,10 +155,27 @@ async function findAssignedWorkerForBooking(booking) {
     const workerById = await User.findOne({ _id: booking.workerId, role: "worker" }).select({
       _id: 1,
       name: 1,
+      role: 1,
       workerProfile: 1
     });
     if (workerById) {
       return workerById;
+    }
+  }
+
+  const workerEmail = String(booking.workerEmail || "")
+    .trim()
+    .toLowerCase();
+  if (workerEmail) {
+    const workerByEmail = await User.findOne({ role: "worker", email: workerEmail }).select({
+      _id: 1,
+      name: 1,
+      role: 1,
+      email: 1,
+      workerProfile: 1
+    });
+    if (workerByEmail) {
+      return workerByEmail;
     }
   }
 
@@ -170,7 +186,84 @@ async function findAssignedWorkerForBooking(booking) {
 
   return User.findOne({ role: "worker", name: workerName })
     .sort({ updatedAt: -1, createdAt: -1 })
-    .select({ _id: 1, name: 1, workerProfile: 1 });
+    .select({ _id: 1, name: 1, role: 1, email: 1, workerProfile: 1 });
+}
+
+function workerHasLinkedBroker(worker) {
+  return Boolean(
+    (worker?.workerProfile?.brokerId && String(worker.workerProfile.brokerId).trim()) ||
+      safeNormalizeBrokerCode(worker?.workerProfile?.brokerCode)
+  );
+}
+
+function getWorkerIdentityScope(worker) {
+  const scope = [];
+  if (worker?._id) {
+    scope.push({ workerId: worker._id });
+  }
+  const workerName = String(worker?.name || "").trim();
+  if (workerName) {
+    scope.push({ workerName });
+  }
+  const workerEmail = String(worker?.email || "")
+    .trim()
+    .toLowerCase();
+  if (workerEmail) {
+    scope.push({ workerEmail });
+  }
+  return scope;
+}
+
+async function getWorkerBrokerCommissionProgress(worker) {
+  const limit = WORKER_BROKER_COMMISSION_JOB_LIMIT;
+  if (!worker || (worker.role && worker.role !== "worker") || !workerHasLinkedBroker(worker)) {
+    return {
+      usedJobs: 0,
+      jobLimit: limit,
+      remainingJobs: limit,
+      usageLabel: `0/${limit}`,
+      isLimitReached: false
+    };
+  }
+
+  const workerScope = getWorkerIdentityScope(worker);
+  if (!workerScope.length) {
+    return {
+      usedJobs: 0,
+      jobLimit: limit,
+      remainingJobs: limit,
+      usageLabel: `0/${limit}`,
+      isLimitReached: false
+    };
+  }
+
+  const brokerScope = [];
+  if (worker.workerProfile?.brokerId) {
+    brokerScope.push({ brokerId: worker.workerProfile.brokerId });
+  }
+  const brokerCode = safeNormalizeBrokerCode(worker.workerProfile?.brokerCode);
+  if (brokerCode) {
+    brokerScope.push({ brokerCode });
+  }
+
+  const usedJobsCount = await Booking.countDocuments({
+    status: "completed",
+    $and: [
+      { $or: workerScope },
+      ...(brokerScope.length ? [{ $or: brokerScope }] : []),
+      { $or: [{ brokerCommissionAmount: { $gt: 0 } }, { brokerCommissionRate: { $gt: 0 } }] }
+    ]
+  });
+
+  const usedJobs = Math.min(limit, usedJobsCount);
+  const remainingJobs = Math.max(0, limit - usedJobs);
+  return {
+    usedJobs,
+    jobLimit: limit,
+    remainingJobs,
+    usageLabel: `${usedJobs}/${limit}`,
+    isLimitReached: usedJobs >= limit
+  };
 }
 
 async function ensureBookingBrokerAttribution(booking) {
@@ -202,7 +295,7 @@ async function ensureBookingBrokerAttribution(booking) {
 
 async function getWorkersLinkedToBroker(brokerUser) {
   if (!brokerUser || brokerUser.role !== "broker") {
-    return { brokerCode: "", workers: [], workerIds: [], workerNames: [] };
+    return { brokerCode: "", workers: [], workerIds: [], workerNames: [], workerEmails: [] };
   }
 
   const brokerCode = safeNormalizeBrokerCode(brokerUser.brokerProfile?.brokerCode);
@@ -214,17 +307,21 @@ async function getWorkersLinkedToBroker(brokerUser) {
   const workers = await User.find(workerFilter).sort({ updatedAt: -1, createdAt: -1 }).lean();
   const workerIds = workers.map((worker) => worker._id);
   const workerNames = workers.map((worker) => worker.name).filter(Boolean);
+  const workerEmails = workers.map((worker) => String(worker.email || "").trim().toLowerCase()).filter(Boolean);
 
-  return { brokerCode, workers, workerIds, workerNames };
+  return { brokerCode, workers, workerIds, workerNames, workerEmails };
 }
 
-function buildWorkerBookingScope(workerIds = [], workerNames = []) {
+function buildWorkerBookingScope(workerIds = [], workerNames = [], workerEmails = []) {
   const scope = [];
   if (workerIds.length) {
     scope.push({ workerId: { $in: workerIds } });
   }
   if (workerNames.length) {
     scope.push({ workerName: { $in: workerNames } });
+  }
+  if (workerEmails.length) {
+    scope.push({ workerEmail: { $in: workerEmails } });
   }
   return scope;
 }
@@ -301,6 +398,16 @@ function calculateBrokerCommissionAmount(booking, options = {}) {
   return Math.round(totalAmount * (commissionRate / 100));
 }
 
+function bookingHasAppliedCommission(booking) {
+  const persistedAmount = Number(booking?.brokerCommissionAmount);
+  if (Number.isFinite(persistedAmount) && persistedAmount > 0) {
+    return true;
+  }
+
+  const configuredRate = Number(booking?.brokerCommissionRate);
+  return Number.isFinite(configuredRate) && configuredRate > 0;
+}
+
 function calculateWorkerNetEarning(booking, options = {}) {
   const totalAmount = getBookingTotalAmount(booking);
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
@@ -312,7 +419,7 @@ function calculateWorkerNetEarning(booking, options = {}) {
   return Math.max(0, totalAmount - discountAmount - brokerCommission);
 }
 
-function bookingBelongsToWorkerScope(booking, workerIdSet, workerNameSet) {
+function bookingBelongsToWorkerScope(booking, workerIdSet, workerNameSet, workerEmailSet = new Set()) {
   if (!booking) {
     return false;
   }
@@ -322,7 +429,12 @@ function bookingBelongsToWorkerScope(booking, workerIdSet, workerNameSet) {
   }
 
   const normalizedWorkerName = normalizeForCompare(booking.workerName);
-  return Boolean(normalizedWorkerName && workerNameSet.has(normalizedWorkerName));
+  if (normalizedWorkerName && workerNameSet.has(normalizedWorkerName)) {
+    return true;
+  }
+
+  const normalizedWorkerEmail = normalizeForCompare(booking.workerEmail);
+  return Boolean(normalizedWorkerEmail && workerEmailSet.has(normalizedWorkerEmail));
 }
 
 async function expireTimedOutPendingBookings(filter = {}) {
@@ -506,7 +618,13 @@ function bookingAssignedToWorker(booking, worker) {
 
   const bookingWorkerName = normalizeForCompare(booking.workerName);
   const workerName = normalizeForCompare(worker.name);
-  return Boolean(bookingWorkerName && workerName && bookingWorkerName === workerName);
+  if (bookingWorkerName && workerName && bookingWorkerName === workerName) {
+    return true;
+  }
+
+  const bookingWorkerEmail = normalizeForCompare(booking.workerEmail);
+  const workerEmail = normalizeForCompare(worker.email);
+  return Boolean(bookingWorkerEmail && workerEmail && bookingWorkerEmail === workerEmail);
 }
 
 function bookingHasAssignedWorker(booking) {
@@ -539,7 +657,7 @@ function isLikelyObjectId(value) {
   return /^[0-9a-fA-F]{24}$/.test(String(value || ""));
 }
 
-module.exports = {
+export {
   ACTIVE_BOOKING_STATUSES,
   BROKER_COMMISSION_RATE_PERCENT,
   CUSTOMER_CANCEL_WINDOW_MS,
@@ -552,15 +670,18 @@ module.exports = {
   bookingHasAssignedWorker,
   buildWorkerBookingScope,
   buildWorkerBookingSummary,
+  bookingHasAppliedCommission,
   calculateBrokerCommissionAmount,
   calculateWorkerNetEarning,
   ensureBookingBrokerAttribution,
   ensureBrokerCodeForUser,
   expireTimedOutPendingBookings,
+  findAssignedWorkerForBooking,
   extractBearerToken,
   findBrokerByCode,
   getAvailableWorkers,
   getBookingTotalAmount,
+  getWorkerBrokerCommissionProgress,
   getLinkedBrokerForWorker,
   getWorkersLinkedToBroker,
   isLikelyObjectId,

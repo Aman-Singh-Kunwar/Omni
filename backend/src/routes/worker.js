@@ -1,23 +1,7 @@
-const express = require("express");
-
-const Booking = require("../models/Booking");
-const User = require("../models/User");
-const {
-  BROKER_COMMISSION_RATE_PERCENT,
-  bookingAssignedToWorker,
-  bookingHasAssignedWorker,
-  calculateBrokerCommissionAmount,
-  calculateWorkerNetEarning,
-  expireTimedOutPendingBookings,
-  getLinkedBrokerForWorker,
-  isLikelyObjectId,
-  pendingBookingVisibleToWorker,
-  readAuthUserFromRequest,
-  requireAuth,
-  safeNormalizeBrokerCode,
-  workerProvidesService
-} = require("./helpers");
-
+import express from "express";
+import Booking from "../models/Booking.js";
+import User from "../models/User.js";
+import { BROKER_COMMISSION_RATE_PERCENT, bookingAssignedToWorker, bookingHasAssignedWorker, calculateBrokerCommissionAmount, calculateWorkerNetEarning, expireTimedOutPendingBookings, getLinkedBrokerForWorker, isLikelyObjectId, pendingBookingVisibleToWorker, readAuthUserFromRequest, requireAuth, workerProvidesService } from "./helpers.js";
 const router = express.Router();
 
 router.get("/worker/dashboard", async (req, res, next) => {
@@ -57,7 +41,7 @@ router.get("/worker/dashboard", async (req, res, next) => {
     await expireTimedOutPendingBookings();
 
     const bookings = await Booking.find({
-      $or: [{ workerId: worker._id }, { workerName: worker.name }, { status: "pending" }]
+      $or: [{ workerId: worker._id }, { workerName: worker.name }, { workerEmail: worker.email }, { status: "pending" }]
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -76,22 +60,15 @@ router.get("/worker/dashboard", async (req, res, next) => {
     const completedJobs = relevantBookings.filter(
       (booking) => bookingAssignedToWorker(booking, worker) && booking.status === "completed"
     );
-    const workerHasLinkedBroker = Boolean(
-      (worker.workerProfile?.brokerId && String(worker.workerProfile.brokerId).trim()) ||
-        safeNormalizeBrokerCode(worker.workerProfile?.brokerCode)
-    );
-    const recentJobs = completedJobs.slice(0, 6).map((booking) => ({
+    const recentJobs = completedJobs.map((booking) => ({
       ...booking,
-      brokerCommissionAmount: calculateBrokerCommissionAmount(booking, { forceCommission: workerHasLinkedBroker }),
-      workerPayout: calculateWorkerNetEarning(booking, { forceCommission: workerHasLinkedBroker })
+      brokerCommissionAmount: calculateBrokerCommissionAmount(booking),
+      workerPayout: calculateWorkerNetEarning(booking)
     }));
 
-    const totalEarnings = completedJobs.reduce(
-      (sum, booking) => sum + calculateWorkerNetEarning(booking, { forceCommission: workerHasLinkedBroker }),
-      0
-    );
+    const totalEarnings = completedJobs.reduce((sum, booking) => sum + calculateWorkerNetEarning(booking), 0);
 
-    const ratings = recentJobs.filter((job) => typeof job.rating === "number").map((job) => job.rating);
+    const ratings = completedJobs.filter((job) => typeof job.rating === "number").map((job) => job.rating);
     const averageRating = ratings.length
       ? Number((ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(1))
       : 0;
@@ -123,7 +100,7 @@ router.get("/worker/reviews", async (req, res, next) => {
 
     const workerFilter = isAuthWorker
       ? {
-          $or: [{ workerId: authUser._id }, { workerName: authUser.name }]
+          $or: [{ workerId: authUser._id }, { workerName: authUser.name }, { workerEmail: authUser.email }]
         }
       : requestedWorkerName
         ? { workerName: requestedWorkerName }
@@ -232,4 +209,4 @@ router.patch("/worker/bookings/:bookingId", requireAuth, async (req, res, next) 
   }
 });
 
-module.exports = router;
+export default router;

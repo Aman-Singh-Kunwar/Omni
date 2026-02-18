@@ -1,20 +1,21 @@
-const express = require("express");
-
-const Booking = require("../models/Booking");
-const {
-  ACTIVE_BOOKING_STATUSES,
-  bookingBelongsToWorkerScope,
-  buildWorkerBookingScope,
-  buildWorkerBookingSummary,
-  calculateBrokerCommissionAmount,
-  expireTimedOutPendingBookings,
-  getBookingTotalAmount,
-  getWorkersLinkedToBroker,
-  normalizeForCompare,
-  readAuthUserFromRequest
-} = require("./helpers");
-
+import express from "express";
+import Booking from "../models/Booking.js";
+import { ACTIVE_BOOKING_STATUSES, bookingHasAppliedCommission, buildWorkerBookingScope, calculateBrokerCommissionAmount, expireTimedOutPendingBookings, getBookingTotalAmount, getWorkersLinkedToBroker, normalizeForCompare, readAuthUserFromRequest } from "./helpers.js";
 const router = express.Router();
+
+function buildBrokerAttributionScope(authUser, brokerCode = "") {
+  const scope = [];
+  if (authUser?._id) {
+    scope.push({ brokerId: authUser._id });
+  }
+
+  const normalizedBrokerCode = String(brokerCode || "").trim().toUpperCase();
+  if (normalizedBrokerCode) {
+    scope.push({ brokerCode: normalizedBrokerCode });
+  }
+
+  return scope;
+}
 
 router.get("/broker/dashboard", async (req, res, next) => {
   try {
@@ -32,27 +33,25 @@ router.get("/broker/dashboard", async (req, res, next) => {
       });
     }
 
-    const { brokerCode, workers, workerIds, workerNames } = await getWorkersLinkedToBroker(authUser);
-    const bookingScopeFilters = buildWorkerBookingScope(workerIds, workerNames);
-    if (brokerCode) {
-      bookingScopeFilters.push({ brokerCode });
-    }
-    bookingScopeFilters.push({ brokerId: authUser._id });
+    const { brokerCode, workers, workerIds, workerNames, workerEmails } = await getWorkersLinkedToBroker(authUser);
+    const workerScopeFilters = buildWorkerBookingScope(workerIds, workerNames, workerEmails);
+    const brokerScopeFilters = buildBrokerAttributionScope(authUser, brokerCode);
+    const bookingsQuery = workerScopeFilters.length
+      ? {
+          $and: [{ $or: brokerScopeFilters }, { $or: workerScopeFilters }]
+        }
+      : {
+          $or: brokerScopeFilters
+        };
 
-    await expireTimedOutPendingBookings({ $or: bookingScopeFilters });
+    await expireTimedOutPendingBookings(bookingsQuery);
 
-    const bookings = await Booking.find({ $or: bookingScopeFilters }).sort({ createdAt: -1 }).lean();
+    const bookings = await Booking.find(bookingsQuery).sort({ createdAt: -1 }).lean();
     const workerIdSet = new Set(workerIds.map((value) => String(value)));
     const workerNameSet = new Set(workerNames.map((value) => normalizeForCompare(value)));
+    const workerEmailSet = new Set(workerEmails.map((value) => normalizeForCompare(value)));
     const completedBookings = bookings.filter((booking) => booking.status === "completed");
-    const totalCommission = completedBookings.reduce(
-      (sum, booking) =>
-        sum +
-        calculateBrokerCommissionAmount(booking, {
-          forceCommission: bookingBelongsToWorkerScope(booking, workerIdSet, workerNameSet)
-        }),
-      0
-    );
+    const totalCommission = completedBookings.reduce((sum, booking) => sum + calculateBrokerCommissionAmount(booking), 0);
     const activeBookings = bookings.filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status)).length;
 
     const recentBookings = bookings.slice(0, 6).map((booking) => ({
@@ -60,19 +59,15 @@ router.get("/broker/dashboard", async (req, res, next) => {
       customer: booking.customerName,
       service: booking.service,
       worker: booking.workerName,
-      commission:
-        booking.status === "completed"
-          ? calculateBrokerCommissionAmount(booking, {
-              forceCommission: bookingBelongsToWorkerScope(booking, workerIdSet, workerNameSet)
-            })
-          : 0,
+      commission: booking.status === "completed" ? calculateBrokerCommissionAmount(booking) : 0,
       status: booking.status
     }));
 
     const commissionByWorkerId = new Map();
     const commissionByWorkerName = new Map();
+    const commissionByWorkerEmail = new Map();
     completedBookings.forEach((booking) => {
-      const commission = calculateBrokerCommissionAmount(booking, { forceCommission: true });
+      const commission = calculateBrokerCommissionAmount(booking);
       if (!commission) {
         return;
       }
@@ -86,24 +81,69 @@ router.get("/broker/dashboard", async (req, res, next) => {
       if (workerName && workerNameSet.has(workerName)) {
         commissionByWorkerName.set(workerName, (commissionByWorkerName.get(workerName) || 0) + commission);
       }
+
+      const workerEmail = normalizeForCompare(booking.workerEmail);
+      if (workerEmail && workerEmailSet.has(workerEmail)) {
+        commissionByWorkerEmail.set(workerEmail, (commissionByWorkerEmail.get(workerEmail) || 0) + commission);
+      }
     });
 
-    const workerBookingsSummary = buildWorkerBookingSummary(bookings);
+    const completedJobsByWorkerId = new Map();
+    const completedJobsByWorkerName = new Map();
+    const completedJobsByWorkerEmail = new Map();
+    const ratingsByWorkerId = new Map();
+    const ratingsByWorkerName = new Map();
+    const ratingsByWorkerEmail = new Map();
+    completedBookings.forEach((booking) => {
+      const workerId = booking.workerId ? String(booking.workerId) : "";
+      const workerName = normalizeForCompare(booking.workerName);
+      const workerEmail = normalizeForCompare(booking.workerEmail);
+
+      if (workerId && workerIdSet.has(workerId)) {
+        completedJobsByWorkerId.set(workerId, (completedJobsByWorkerId.get(workerId) || 0) + 1);
+        if (typeof booking.rating === "number") {
+          ratingsByWorkerId.set(workerId, [...(ratingsByWorkerId.get(workerId) || []), booking.rating]);
+        }
+      }
+      if (workerName && workerNameSet.has(workerName)) {
+        completedJobsByWorkerName.set(workerName, (completedJobsByWorkerName.get(workerName) || 0) + 1);
+        if (typeof booking.rating === "number") {
+          ratingsByWorkerName.set(workerName, [...(ratingsByWorkerName.get(workerName) || []), booking.rating]);
+        }
+      }
+      if (workerEmail && workerEmailSet.has(workerEmail)) {
+        completedJobsByWorkerEmail.set(workerEmail, (completedJobsByWorkerEmail.get(workerEmail) || 0) + 1);
+        if (typeof booking.rating === "number") {
+          ratingsByWorkerEmail.set(workerEmail, [...(ratingsByWorkerEmail.get(workerEmail) || []), booking.rating]);
+        }
+      }
+    });
+
     const topWorkers = workers
       .map((worker) => {
-        const summary = workerBookingsSummary.get(worker.name) || { completedJobs: 0, averageRating: 0 };
         const servicesProvided = worker.workerProfile?.servicesProvided || [];
         const workerId = String(worker._id);
         const workerName = normalizeForCompare(worker.name);
+        const workerEmail = normalizeForCompare(worker.email);
+        const completedJobs =
+          completedJobsByWorkerId.get(workerId) ||
+          completedJobsByWorkerName.get(workerName) ||
+          completedJobsByWorkerEmail.get(workerEmail) ||
+          0;
+        const ratingValues =
+          ratingsByWorkerId.get(workerId) || ratingsByWorkerName.get(workerName) || ratingsByWorkerEmail.get(workerEmail) || [];
+        const averageRating = ratingValues.length
+          ? Number((ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length).toFixed(1))
+          : 0;
         const brokerCommission = Math.round(
-          commissionByWorkerId.get(workerId) || commissionByWorkerName.get(workerName) || 0
+          commissionByWorkerId.get(workerId) || commissionByWorkerName.get(workerName) || commissionByWorkerEmail.get(workerEmail) || 0
         );
         return {
           id: worker._id,
           name: worker.name,
           service: servicesProvided[0] || "General Service",
-          rating: summary.averageRating,
-          jobs: summary.completedJobs,
+          rating: averageRating,
+          jobs: completedJobs,
           brokerCommission
         };
       })
@@ -133,13 +173,18 @@ router.get("/broker/workers", async (req, res, next) => {
       return res.json({ brokerCode: "", workers: [] });
     }
 
-    const { brokerCode, workers, workerIds, workerNames } = await getWorkersLinkedToBroker(authUser);
-    const bookingScopeFilters = buildWorkerBookingScope(workerIds, workerNames);
-    const bookings = bookingScopeFilters.length
-      ? await Booking.find({ $or: bookingScopeFilters })
+    const { brokerCode, workers, workerIds, workerNames, workerEmails } = await getWorkersLinkedToBroker(authUser);
+    const workerScopeFilters = buildWorkerBookingScope(workerIds, workerNames, workerEmails);
+    const brokerScopeFilters = buildBrokerAttributionScope(authUser, brokerCode);
+    const bookings =
+      workerScopeFilters.length && brokerScopeFilters.length
+        ? await Booking.find({
+            $and: [{ $or: brokerScopeFilters }, { $or: workerScopeFilters }]
+          })
           .select({
             workerId: 1,
             workerName: 1,
+            workerEmail: 1,
             status: 1,
             amount: 1,
             originalAmount: 1,
@@ -150,10 +195,11 @@ router.get("/broker/workers", async (req, res, next) => {
             rating: 1
           })
           .lean()
-      : [];
+        : [];
 
     const statsByWorkerId = new Map();
     const statsByWorkerName = new Map();
+    const statsByWorkerEmail = new Map();
     workers.forEach((worker) => {
       const stats = {
         totalJobs: 0,
@@ -164,12 +210,16 @@ router.get("/broker/workers", async (req, res, next) => {
       };
       statsByWorkerId.set(String(worker._id), stats);
       statsByWorkerName.set(normalizeForCompare(worker.name), stats);
+      statsByWorkerEmail.set(normalizeForCompare(worker.email), stats);
     });
 
     bookings.forEach((booking) => {
       let stats = booking.workerId ? statsByWorkerId.get(String(booking.workerId)) : null;
       if (!stats) {
         stats = statsByWorkerName.get(normalizeForCompare(booking.workerName));
+      }
+      if (!stats) {
+        stats = statsByWorkerEmail.get(normalizeForCompare(booking.workerEmail));
       }
       if (!stats) {
         return;
@@ -179,7 +229,7 @@ router.get("/broker/workers", async (req, res, next) => {
       if (booking.status === "completed") {
         stats.completedJobs += 1;
         stats.totalCompletedAmount += getBookingTotalAmount(booking);
-        stats.totalBrokerCommission += calculateBrokerCommissionAmount(booking, { forceCommission: true });
+        stats.totalBrokerCommission += calculateBrokerCommissionAmount(booking);
         if (typeof booking.rating === "number") {
           stats.ratings.push(booking.rating);
         }
@@ -188,7 +238,9 @@ router.get("/broker/workers", async (req, res, next) => {
 
     const workerItems = workers.map((worker) => {
       const stats =
-        statsByWorkerId.get(String(worker._id)) || statsByWorkerName.get(normalizeForCompare(worker.name)) || {
+        statsByWorkerId.get(String(worker._id)) ||
+        statsByWorkerName.get(normalizeForCompare(worker.name)) ||
+        statsByWorkerEmail.get(normalizeForCompare(worker.email)) || {
           totalJobs: 0,
           completedJobs: 0,
           totalCompletedAmount: 0,
@@ -230,31 +282,34 @@ router.get("/broker/bookings", async (req, res, next) => {
       return res.json({ brokerCode: "", bookings: [] });
     }
 
-    const { brokerCode, workerIds, workerNames } = await getWorkersLinkedToBroker(authUser);
-    const bookingScopeFilters = buildWorkerBookingScope(workerIds, workerNames);
-    if (!bookingScopeFilters.length) {
+    const { brokerCode, workerIds, workerNames, workerEmails } = await getWorkersLinkedToBroker(authUser);
+    const workerScopeFilters = buildWorkerBookingScope(workerIds, workerNames, workerEmails);
+    const brokerScopeFilters = buildBrokerAttributionScope(authUser, brokerCode);
+    if (!workerScopeFilters.length || !brokerScopeFilters.length) {
       return res.json({ brokerCode, bookings: [] });
     }
 
     const completedBookings = await Booking.find({
       status: "completed",
-      $or: bookingScopeFilters
+      $and: [{ $or: brokerScopeFilters }, { $or: workerScopeFilters }]
     })
       .sort({ updatedAt: -1, createdAt: -1 })
       .lean();
 
-    const bookings = completedBookings.map((booking) => ({
-      id: String(booking._id),
-      customerName: booking.customerName || "Customer",
-      workerName: booking.workerName || "Worker",
-      service: booking.service || "Service",
-      date: booking.date || "",
-      time: booking.time || "",
-      amount: getBookingTotalAmount(booking),
-      brokerCommission: calculateBrokerCommissionAmount(booking, { forceCommission: true }),
-      rating: typeof booking.rating === "number" ? booking.rating : 0,
-      status: booking.status
-    }));
+    const bookings = completedBookings
+      .filter((booking) => bookingHasAppliedCommission(booking))
+      .map((booking) => ({
+        id: String(booking._id),
+        customerName: booking.customerName || "Customer",
+        workerName: booking.workerName || "Worker",
+        service: booking.service || "Service",
+        date: booking.date || "",
+        time: booking.time || "",
+        amount: getBookingTotalAmount(booking),
+        brokerCommission: calculateBrokerCommissionAmount(booking),
+        rating: typeof booking.rating === "number" ? booking.rating : 0,
+        status: booking.status
+      }));
 
     return res.json({
       brokerCode,
@@ -265,4 +320,4 @@ router.get("/broker/bookings", async (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

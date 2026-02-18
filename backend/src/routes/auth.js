@@ -1,17 +1,9 @@
-const express = require("express");
-const bcrypt = require("bcryptjs");
-
-const User = require("../models/User");
-const {
-  ensureBrokerCodeForUser,
-  extractBearerToken,
-  generateUniqueBrokerCode,
-  requireAuth,
-  signToken,
-  toAuthUser,
-  verifyToken
-} = require("./helpers");
-
+import express from "express";
+import bcrypt from "bcryptjs";
+import User from "../models/User.js";
+import { ensureBrokerCodeForUser, extractBearerToken, generateUniqueBrokerCode, requireAuth, signToken, toAuthUser, verifyToken } from "./helpers.js";
+import logger from "../utils/logger.js";
+import { syncUserFamilyByEmail } from "../utils/userSync.js";
 const router = express.Router();
 
 router.post("/auth/signup", async (req, res, next) => {
@@ -47,6 +39,7 @@ router.post("/auth/signup", async (req, res, next) => {
     }
 
     const user = await User.create(userPayload);
+    await syncUserFamilyByEmail(user);
     const token = signToken(user);
 
     return res.status(201).json({
@@ -87,6 +80,11 @@ router.post("/auth/login", async (req, res, next) => {
     await user.save();
 
     const token = signToken(user);
+    logger.info("Login successful", {
+      userId: String(user._id),
+      email,
+      role: user.role
+    });
 
     return res.json({
       user: toAuthUser(user),
@@ -173,6 +171,7 @@ router.post("/auth/switch-role", requireAuth, async (req, res, next) => {
     await ensureBrokerCodeForUser(targetUser);
     targetUser.lastLoginAt = new Date();
     await targetUser.save();
+    await syncUserFamilyByEmail(req.authUser);
 
     const token = signToken(targetUser);
     return res.json({
@@ -184,4 +183,17 @@ router.post("/auth/switch-role", requireAuth, async (req, res, next) => {
   }
 });
 
-module.exports = router;
+router.post("/auth/logout", requireAuth, async (req, res, next) => {
+  try {
+    logger.info("Logout successful", {
+      userId: String(req.authUser._id),
+      email: req.authUser.email,
+      role: req.authUser.role
+    });
+    return res.json({ message: "Logged out successfully." });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+export default router;
