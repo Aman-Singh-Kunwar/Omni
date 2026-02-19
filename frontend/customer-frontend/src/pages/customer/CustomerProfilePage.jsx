@@ -1,7 +1,18 @@
 import React from "react";
 import { User } from "lucide-react";
 
+function toDateInputValue(date) {
+  return date.toISOString().split("T")[0];
+}
+
 function CustomerProfilePage({ userName, userEmail, profileForm, setProfileForm, profileStatus, handleProfileSave }) {
+  const maxCustomerDob = (() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 10);
+    date.setDate(date.getDate() - 1);
+    return toDateInputValue(date);
+  })();
+
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
       <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
@@ -16,7 +27,8 @@ function CustomerProfilePage({ userName, userEmail, profileForm, setProfileForm,
             <p className="text-gray-600">{profileForm.phone || "No phone set"}</p>
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="rounded-lg border border-gray-200 bg-white/80 p-4 space-y-4">
+          <p className="text-sm font-semibold text-gray-900">Edit Profile Details</p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <input
@@ -64,8 +76,10 @@ function CustomerProfilePage({ userName, userEmail, profileForm, setProfileForm,
               type="date"
               value={profileForm.dateOfBirth}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))}
+              max={maxCustomerDob}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
+            <p className="mt-1 text-xs text-gray-500">Customer age must be more than 10 years.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
@@ -77,8 +91,8 @@ function CustomerProfilePage({ userName, userEmail, profileForm, setProfileForm,
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
           </div>
-          {profileStatus.error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{profileStatus.error}</p>}
-          {profileStatus.success && <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">{profileStatus.success}</p>}
+          {profileStatus.error && <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-700">{profileStatus.error}</p>}
+          {profileStatus.success && <p className="rounded bg-green-100 px-3 py-2 text-sm text-green-700">{profileStatus.success}</p>}
           <button
             onClick={handleProfileSave}
             disabled={profileStatus.loading}

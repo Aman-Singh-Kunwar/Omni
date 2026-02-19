@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from "../assets/images/omni-logo.png";
 import api from "../api";
@@ -9,37 +9,8 @@ import BrokerEarningsPage from "../pages/broker/BrokerEarningsPage";
 import BrokerProfilePage from "../pages/broker/BrokerProfilePage";
 import BrokerSettingsPage from "../pages/broker/BrokerSettingsPage";
 import { Bell, Settings, Menu, X, User, ChevronDown, LogOut, Briefcase, Wrench } from "lucide-react";
-
-function toStableId(value, fallback = "") {
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value);
-  }
-
-  if (value && typeof value === "object") {
-    if (typeof value.$oid === "string") {
-      return value.$oid;
-    }
-    if (typeof value.id === "string" || typeof value.id === "number") {
-      return String(value.id);
-    }
-    if (typeof value._id === "string" || typeof value._id === "number") {
-      return String(value._id);
-    }
-    if (typeof value.toString === "function") {
-      const next = value.toString();
-      if (next && next !== "[object Object]") {
-        return next;
-      }
-    }
-    try {
-      return JSON.stringify(value);
-    } catch (_error) {
-      return String(fallback || "");
-    }
-  }
-
-  return String(fallback || "");
-}
+import { toShortErrorMessage, toStableId } from "@shared/utils/common";
+import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
 const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah Broker", userEmail = "", authToken = "" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -70,6 +41,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
   const [profileStatus, setProfileStatus] = useState({ loading: false, error: "", success: "" });
   const userMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
+  const navRef = useRef(null);
   const notificationStorageKey = useMemo(
     () => `omni:notifications:broker:${String(userEmail || userName || "broker").trim().toLowerCase()}`,
     [userEmail, userName]
@@ -101,7 +73,8 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
         items.push({
           id: `broker-request-${bookingId}`,
           title: "New booking request",
-          message: `${customerLabel} requested ${serviceLabel}.`
+          message: `${customerLabel} requested ${serviceLabel}.`,
+          targetTab: "bookings"
         });
       }
 
@@ -109,13 +82,15 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
         items.push({
           id: `broker-job-done-${bookingId}`,
           title: "Job done",
-          message: `${serviceLabel} completed by ${booking.worker || "worker"}.`
+          message: `${serviceLabel} completed by ${booking.worker || "worker"}.`,
+          targetTab: "bookings"
         });
         if (Number(booking.commission || 0) > 0) {
           items.push({
             id: `broker-earning-${bookingId}`,
             title: "Earning credited",
-            message: `INR ${Number(booking.commission || 0).toLocaleString("en-IN")} commission added.`
+            message: `INR ${Number(booking.commission || 0).toLocaleString("en-IN")} commission added.`,
+            targetTab: "earnings"
           });
         }
       }
@@ -125,7 +100,8 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
       items.push({
         id: "broker-active-bookings",
         title: "Active bookings",
-        message: `${Number(stats.activeBookings)} active bookings in your network.`
+        message: `${Number(stats.activeBookings)} active bookings in your network.`,
+        targetTab: "bookings"
       });
     }
 
@@ -158,25 +134,32 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
       navigate(nextPath);
     }
   };
-
-  useEffect(() => {
-    const handleOutsideTap = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setShowUserMenu(false);
-      }
-      if (notificationMenuRef.current && !notificationMenuRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideTap);
-    document.addEventListener("touchstart", handleOutsideTap);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideTap);
-      document.removeEventListener("touchstart", handleOutsideTap);
-    };
+  const hideUserMenu = useCallback(() => {
+    setShowUserMenu(false);
   }, []);
+  const hideNotifications = useCallback(() => {
+    setShowNotifications(false);
+  }, []);
+  const hideMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+  }, []);
+  const closeQuickMenus = useCallback(() => {
+    hideUserMenu();
+    hideNotifications();
+    hideMobileMenu();
+  }, [hideMobileMenu, hideNotifications, hideUserMenu]);
+
+  useQuickMenuAutoClose({
+    userMenuRef,
+    notificationMenuRef,
+    navRef,
+    hideUserMenu,
+    hideNotifications,
+    hideMobileMenu,
+    closeQuickMenus,
+    routePath: location.pathname,
+    routeSearch: location.search
+  });
 
   useEffect(() => {
     try {
@@ -329,6 +312,36 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
     }
     setReadNotificationIds((prev) => (prev.includes(normalizedId) ? prev : [...prev, normalizedId]));
   };
+  const resolveNotificationTab = (notification = {}) => {
+    const preferredTab = String(notification.targetTab || "").trim();
+    if (preferredTab && tabPathMap[preferredTab]) {
+      return preferredTab;
+    }
+
+    const normalizedId = toStableId(notification.id).toLowerCase();
+    if (normalizedId.startsWith("broker-earning-")) {
+      return "earnings";
+    }
+    if (
+      normalizedId.startsWith("broker-request-") ||
+      normalizedId.startsWith("broker-job-done-") ||
+      normalizedId.startsWith("broker-active-bookings")
+    ) {
+      return "bookings";
+    }
+
+    return activeTab;
+  };
+  const handleNotificationClick = (notification) => {
+    const normalizedId = toStableId(notification?.id);
+    if (!normalizedId) {
+      return;
+    }
+
+    handleMarkNotificationRead(normalizedId);
+    setShowNotifications(false);
+    navigateToTab(resolveNotificationTab(notification));
+  };
   const handleMarkAllNotificationsRead = () => {
     const nextIds = visibleNotificationItems.map((notification) => toStableId(notification.id)).filter(Boolean);
     setReadNotificationIds((prev) => Array.from(new Set([...prev, ...nextIds])));
@@ -377,7 +390,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
     } catch (error) {
       setProfileStatus({
         loading: false,
-        error: error.response?.data?.message || "Unable to save profile.",
+        error: toShortErrorMessage(error.response?.data?.message, "Unable to save profile."),
         success: ""
       });
     }
@@ -411,7 +424,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
       );
     }
 
-    return <BrokerSettingsPage />;
+    return <BrokerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} />;
   };
 
   const GlobalStyles = () => (
@@ -435,7 +448,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
     <>
       <GlobalStyles />
       <div className="min-h-screen bg-gray-50 animated-gradient">
-        <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <nav ref={navRef} className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-8">
@@ -463,7 +476,11 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <div ref={notificationMenuRef} className="relative">
                   <button
-                    onClick={() => setShowNotifications((prev) => !prev)}
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setIsMobileMenuOpen(false);
+                      setShowNotifications((prev) => !prev);
+                    }}
                     className="relative p-2 text-gray-500 hover:text-gray-700"
                     aria-label="Open notifications"
                   >
@@ -487,7 +504,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                               <button
                                 key={normalizedNotificationId}
                                 type="button"
-                                onClick={() => handleMarkNotificationRead(normalizedNotificationId)}
+                                onClick={() => handleNotificationClick(notification)}
                                 className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
                                   isRead ? "bg-gray-50" : "bg-green-50/40"
                                 }`}
@@ -528,7 +545,11 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
 
                 <div ref={userMenuRef} className="relative">
                   <button
-                    onClick={() => setShowUserMenu((prev) => !prev)}
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setIsMobileMenuOpen(false);
+                      setShowUserMenu((prev) => !prev);
+                    }}
                     className="hidden lg:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50/80"
                   >
                     <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -577,7 +598,14 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                   )}
                 </div>
 
-                <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden p-2 text-gray-500">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setShowNotifications(false);
+                    setIsMobileMenuOpen((prev) => !prev);
+                  }}
+                  className="lg:hidden p-2 text-gray-500"
+                >
                   {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
               </div>

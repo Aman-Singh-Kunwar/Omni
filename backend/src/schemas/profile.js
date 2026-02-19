@@ -35,6 +35,40 @@ function normalizeDate(value) {
   return date;
 }
 
+function calculateAgeYears(dateOfBirth, referenceDate = new Date()) {
+  const birth = new Date(dateOfBirth);
+  const reference = new Date(referenceDate);
+
+  let years = reference.getFullYear() - birth.getFullYear();
+  const monthDelta = reference.getMonth() - birth.getMonth();
+  const hasBirthdayPassed = monthDelta > 0 || (monthDelta === 0 && reference.getDate() >= birth.getDate());
+  if (!hasBirthdayPassed) {
+    years -= 1;
+  }
+  return years;
+}
+
+function validateDateOfBirthForRole(role, dateOfBirth) {
+  const age = calculateAgeYears(dateOfBirth);
+  if (!Number.isFinite(age) || age < 0) {
+    const error = new Error("Invalid dateOfBirth value.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if ((role === "worker" || role === "broker") && (age < 18 || age > 60)) {
+    const error = new Error("Worker and broker age must be between 18 and 60 years.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (role === "customer" && age <= 10) {
+    const error = new Error("Customer must be older than 10 years.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 function normalizeServices(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -122,6 +156,7 @@ function buildProfileUpdate(role, payload = {}) {
       error.statusCode = 400;
       throw error;
     }
+    validateDateOfBirthForRole(role, dateOfBirth);
     updates.dateOfBirth = dateOfBirth;
   } else {
     updates.dateOfBirth = undefined;

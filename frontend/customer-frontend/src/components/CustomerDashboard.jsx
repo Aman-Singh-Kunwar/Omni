@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from '../assets/images/omni-logo.png';
 import api from '../api';
@@ -29,6 +29,8 @@ import {
   ChevronDown,
   Briefcase
 } from 'lucide-react';
+import { toShortErrorMessage, toStableId } from "@shared/utils/common";
+import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
 const SERVICE_PRICE_MIN = 250;
 const SERVICE_PRICE_MAX = 2500;
@@ -57,37 +59,6 @@ function getRandomServicePrice(serviceName) {
 
 function formatInr(amount) {
   return `INR ${Number(amount || 0).toLocaleString('en-IN')}`;
-}
-
-function toStableId(value, fallback = '') {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return String(value);
-  }
-
-  if (value && typeof value === 'object') {
-    if (typeof value.$oid === 'string') {
-      return value.$oid;
-    }
-    if (typeof value.id === 'string' || typeof value.id === 'number') {
-      return String(value.id);
-    }
-    if (typeof value._id === 'string' || typeof value._id === 'number') {
-      return String(value._id);
-    }
-    if (typeof value.toString === 'function') {
-      const next = value.toString();
-      if (next && next !== '[object Object]') {
-        return next;
-      }
-    }
-    try {
-      return JSON.stringify(value);
-    } catch (_error) {
-      return String(fallback || '');
-    }
-  }
-
-  return String(fallback || '');
 }
 
 function toFavoriteProvider(provider = {}) {
@@ -171,6 +142,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   const [profileStatus, setProfileStatus] = useState({ loading: false, error: '', success: '' });
   const userMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
+  const navRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const tabPathMap = useMemo(
@@ -225,6 +197,20 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       navigate(nextPath);
     }
   };
+  const hideUserMenu = useCallback(() => {
+    setShowUserMenu(false);
+  }, []);
+  const hideNotifications = useCallback(() => {
+    setShowNotifications(false);
+  }, []);
+  const hideMobileMenu = useCallback(() => {
+    setShowMobileMenu(false);
+  }, []);
+  const closeQuickMenus = useCallback(() => {
+    hideUserMenu();
+    hideNotifications();
+    hideMobileMenu();
+  }, [hideMobileMenu, hideNotifications, hideUserMenu]);
   const navigateBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -358,7 +344,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         items.push({
           id: `booking-confirmed-${bookingId}`,
           title: 'Booking confirmed',
-          message: `${serviceLabel} booking is confirmed for ${bookingTimeLabel}.`
+          message: `${serviceLabel} booking is confirmed for ${bookingTimeLabel}.`,
+          targetTab: 'bookings'
         });
       }
 
@@ -366,7 +353,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         items.push({
           id: `payment-done-${bookingId}`,
           title: 'Payment done',
-          message: `Payment completed for ${serviceLabel}.`
+          message: `Payment completed for ${serviceLabel}.`,
+          targetTab: 'bookings'
         });
       }
 
@@ -374,7 +362,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         items.push({
           id: `feedback-submitted-${bookingId}`,
           title: 'Feedback submitted',
-          message: `Feedback updated for ${serviceLabel}.`
+          message: `Feedback updated for ${serviceLabel}.`,
+          targetTab: 'bookings'
         });
       }
     });
@@ -396,24 +385,17 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     [visibleNotificationItems, readNotificationIds]
   );
 
-  useEffect(() => {
-    const handleOutsideTap = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setShowUserMenu(false);
-      }
-      if (notificationMenuRef.current && !notificationMenuRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideTap);
-    document.addEventListener('touchstart', handleOutsideTap);
-
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideTap);
-      document.removeEventListener('touchstart', handleOutsideTap);
-    };
-  }, []);
+  useQuickMenuAutoClose({
+    userMenuRef,
+    notificationMenuRef,
+    navRef,
+    hideUserMenu,
+    hideNotifications,
+    hideMobileMenu,
+    closeQuickMenus,
+    routePath: location.pathname,
+    routeSearch: location.search
+  });
 
   useEffect(() => {
     if (activeTab !== 'bookService') {
@@ -728,6 +710,33 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     }
     setReadNotificationIds((prev) => (prev.includes(normalizedId) ? prev : [...prev, normalizedId]));
   };
+  const resolveNotificationTab = (notification = {}) => {
+    const preferredTab = String(notification.targetTab || '').trim();
+    if (preferredTab && tabPathMap[preferredTab]) {
+      return preferredTab;
+    }
+
+    const normalizedId = toStableId(notification.id).toLowerCase();
+    if (
+      normalizedId.startsWith('booking-confirmed-') ||
+      normalizedId.startsWith('payment-done-') ||
+      normalizedId.startsWith('feedback-submitted-')
+    ) {
+      return 'bookings';
+    }
+
+    return activeTab;
+  };
+  const handleNotificationClick = (notification) => {
+    const normalizedId = toStableId(notification?.id);
+    if (!normalizedId) {
+      return;
+    }
+
+    handleMarkNotificationRead(normalizedId);
+    setShowNotifications(false);
+    navigateToTab(resolveNotificationTab(notification));
+  };
   const handleMarkAllNotificationsRead = () => {
     const nextIds = visibleNotificationItems.map((notification) => toStableId(notification.id)).filter(Boolean);
     setReadNotificationIds((prev) => Array.from(new Set([...prev, ...nextIds])));
@@ -1024,7 +1033,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     } catch (error) {
       setProfileStatus({
         loading: false,
-        error: error.response?.data?.message || 'Unable to save profile.',
+        error: toShortErrorMessage(error.response?.data?.message, 'Unable to save profile.'),
         success: ''
       });
     }
@@ -1162,7 +1171,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       );
     }
 
-    return <CustomerSettingsPage />;
+    return <CustomerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} />;
   };
 
   const GlobalStyles = () => (
@@ -1186,7 +1195,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     <>
       <GlobalStyles />
       <div className="min-h-screen bg-gray-50 animated-gradient">
-        <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <nav ref={navRef} className="bg-white shadow-sm border-b sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-8">
@@ -1216,7 +1225,11 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <div ref={notificationMenuRef} className="relative">
                   <button
-                    onClick={() => setShowNotifications((prev) => !prev)}
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setShowMobileMenu(false);
+                      setShowNotifications((prev) => !prev);
+                    }}
                     className="relative p-2 text-gray-400 hover:text-gray-600"
                     aria-label="Open notifications"
                   >
@@ -1240,7 +1253,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                               <button
                                 key={normalizedNotificationId}
                                 type="button"
-                                onClick={() => handleMarkNotificationRead(normalizedNotificationId)}
+                                onClick={() => handleNotificationClick(notification)}
                                 className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
                                   isRead ? 'bg-gray-50' : 'bg-blue-50/40'
                                 }`}
@@ -1281,7 +1294,11 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
 
                 <div ref={userMenuRef} className="relative">
                   <button
-                    onClick={() => setShowUserMenu((prev) => !prev)}
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setShowMobileMenu(false);
+                      setShowUserMenu((prev) => !prev);
+                    }}
                     className="hidden md:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50"
                   >
                     <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
@@ -1330,7 +1347,14 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                   )}
                 </div>
 
-                <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-2 text-gray-500">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setShowNotifications(false);
+                    setShowMobileMenu((prev) => !prev);
+                  }}
+                  className="md:hidden p-2 text-gray-500"
+                >
                   {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
               </div>

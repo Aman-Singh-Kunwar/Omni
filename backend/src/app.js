@@ -5,10 +5,33 @@ import logger from "./utils/logger.js";
 
 const app = express();
 
+function isDatabaseConnectivityError(error) {
+  const name = String(error?.name || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+
+  if (name.includes("mongoserverselectionerror") || name.includes("mongooseerror")) {
+    return true;
+  }
+
+  const patterns = [
+    "enotfound",
+    "eai_again",
+    "etimedout",
+    "econnrefused",
+    "server selection timed out",
+    "getaddrinfo",
+    "querysrv",
+    "mongodb.net"
+  ];
+
+  return patterns.some((pattern) => message.includes(pattern));
+}
+
 app.use(cors());
 app.use(express.json());
 app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
+  const method = req.method || "UNKNOWN";
 
   res.json = (payload) => {
     if (payload && typeof payload === "object" && typeof payload.message === "string" && payload.message.trim()) {
@@ -28,6 +51,22 @@ app.use((req, res, next) => {
       } else {
         logger.infoOnce(onceKey, "Notification sent to frontend", meta);
       }
+
+      if (statusCode >= 500) {
+        logger.errorOnce(`api_error:${method}:${path}:${statusCode}:${payload.message}`, "API request failed", {
+          method,
+          path,
+          statusCode,
+          message: payload.message
+        });
+      } else if (statusCode >= 400) {
+        logger.warnOnce(`api_warn:${method}:${path}:${statusCode}:${payload.message}`, "API request warning", {
+          method,
+          path,
+          statusCode,
+          message: payload.message
+        });
+      }
     }
 
     return originalJson(payload);
@@ -43,7 +82,8 @@ app.get("/", (_req, res) => {
 app.use("/api", routes);
 
 app.use((err, req, res, _next) => {
-  const statusCode = err?.statusCode || 500;
+  const isDbConnectivityIssue = isDatabaseConnectivityError(err);
+  const statusCode = isDbConnectivityIssue ? 503 : err?.statusCode || 500;
   logger.errorOnce(`route_error:${statusCode}:${req.method}:${req.originalUrl || req.url}:${err?.message || "unknown"}`, "Unhandled route error", {
     method: req.method,
     path: req.originalUrl || req.url,
@@ -53,7 +93,7 @@ app.use((err, req, res, _next) => {
   });
 
   res.status(statusCode).json({
-    message: err?.message || "Internal server error"
+    message: isDbConnectivityIssue ? "Database temporarily unreachable. Please try again." : err?.message || "Internal server error"
   });
 });
 

@@ -129,6 +129,16 @@ const workerProfileSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+const notificationSettingsSchema = new mongoose.Schema(
+  {
+    notificationsEnabled: { type: Boolean, default: true },
+    jobRequests: { type: Boolean, default: true },
+    payments: { type: Boolean, default: true },
+    jobAlerts: { type: Boolean, default: true },
+    reminders: { type: Boolean, default: false }
+  },
+  { _id: false }
+);
 
 const userSchema = new mongoose.Schema(
   {
@@ -148,9 +158,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, required: true, enum: ["customer", "broker", "worker"] },
     lastLoginAt: { type: Date },
+    deletedCredentialsAt: { type: Date, default: null },
     customerProfile: { type: customerProfileSchema, default: () => ({}) },
     brokerProfile: { type: brokerProfileSchema, default: () => ({}) },
-    workerProfile: { type: workerProfileSchema, default: () => ({}) }
+    workerProfile: { type: workerProfileSchema, default: () => ({}) },
+    notificationSettings: { type: notificationSettingsSchema, default: () => ({}) }
   },
   { timestamps: true }
 );

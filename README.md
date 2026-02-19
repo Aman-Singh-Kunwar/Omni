@@ -13,17 +13,18 @@ This README covers complete local setup from clone to first run, including envir
 1. [What This Project Includes](#what-this-project-includes)
 2. [Tech Stack](#tech-stack)
 3. [Monorepo Structure](#monorepo-structure)
-4. [Port Map](#port-map)
-5. [Prerequisites](#prerequisites)
-6. [Clone and Install](#clone-and-install)
-7. [Environment Setup (.env)](#environment-setup-env)
-8. [Run the Project Locally](#run-the-project-locally)
-9. [Build for Production](#build-for-production)
-10. [Application Workflow](#application-workflow)
-11. [API Overview](#api-overview)
-12. [Data Model Overview](#data-model-overview)
-13. [Troubleshooting](#troubleshooting)
-14. [Security Notes](#security-notes)
+4. [Feature Summary](#feature-summary)
+5. [Port Map](#port-map)
+6. [Prerequisites](#prerequisites)
+7. [Clone and Install](#clone-and-install)
+8. [Environment Setup (.env)](#environment-setup-env)
+9. [Run the Project Locally](#run-the-project-locally)
+10. [Build for Production](#build-for-production)
+11. [Application Workflow](#application-workflow)
+12. [API Overview](#api-overview)
+13. [Data Model Overview](#data-model-overview)
+14. [Troubleshooting](#troubleshooting)
+15. [Security Notes](#security-notes)
 
 ## What This Project Includes
 
@@ -32,6 +33,12 @@ This README covers complete local setup from clone to first run, including envir
 - `frontend/customer-frontend`: Customer dashboard and booking flows.
 - `frontend/broker-frontend`: Broker dashboard for worker management and commission views.
 - `frontend/worker-frontend`: Worker dashboard for requests, schedule, earnings, and reviews.
+
+## Feature Summary
+
+Short feature list by frontend is available in:
+
+- `features.md`
 
 ## Tech Stack
 

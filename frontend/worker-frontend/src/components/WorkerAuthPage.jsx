@@ -16,8 +16,10 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
     name: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    brokerCode: ""
   });
+  const [showReferralCodeField, setShowReferralCodeField] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState({ loading: false, error: "" });
@@ -31,13 +33,35 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
       setStatus({ loading: false, error: "Passwords do not match." });
       return;
     }
+    if (mode === "signup" && showReferralCodeField) {
+      const normalizedBrokerCode = String(form.brokerCode || "")
+        .trim()
+        .toUpperCase();
+      if (!normalizedBrokerCode) {
+        setStatus({ loading: false, error: "Please enter referral code or uncheck referral option." });
+        return;
+      }
+      if (!/^[A-Z0-9]{6}$/.test(normalizedBrokerCode)) {
+        setStatus({ loading: false, error: "Referral code must be exactly 6 letters/numbers." });
+        return;
+      }
+    }
 
     setStatus({ loading: true, error: "" });
     try {
       const endpoint = mode === "signup" ? "/auth/signup" : "/auth/login";
+      const normalizedBrokerCode = String(form.brokerCode || "")
+        .trim()
+        .toUpperCase();
       const payload =
         mode === "signup"
-          ? { name: form.name, email: form.email, password: form.password, role }
+          ? {
+              name: form.name,
+              email: form.email,
+              password: form.password,
+              role,
+              ...(showReferralCodeField && normalizedBrokerCode ? { brokerCode: normalizedBrokerCode } : {})
+            }
           : { email: form.email, password: form.password, role };
 
       const response = await api.post(endpoint, payload);
@@ -128,6 +152,36 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
                 />
                 Show confirm password
               </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowReferralCodeField((prev) => !prev);
+                  if (showReferralCodeField) {
+                    setForm((prev) => ({ ...prev, brokerCode: "" }));
+                  }
+                }}
+                className="text-left text-sm font-medium text-purple-600 hover:text-purple-700"
+              >
+                {showReferralCodeField ? "Remove referral code" : "Add referral code"}
+              </button>
+              {showReferralCodeField && (
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Referral Code</span>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border px-3 py-2 uppercase tracking-widest"
+                    value={form.brokerCode}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        brokerCode: event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)
+                      }))
+                    }
+                    placeholder="Enter 6-character code"
+                    maxLength={6}
+                  />
+                </label>
+              )}
             </>
           )}
         </div>

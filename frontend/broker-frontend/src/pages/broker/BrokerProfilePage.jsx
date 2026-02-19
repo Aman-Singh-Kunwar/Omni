@@ -1,18 +1,49 @@
 import React from "react";
+import { User } from "lucide-react";
+
+function toDateInputValue(date) {
+  return date.toISOString().split("T")[0];
+}
 
 function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleProfileSave }) {
+  const minBrokerDob = (() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 60);
+    return toDateInputValue(date);
+  })();
+  const maxBrokerDob = (() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    return toDateInputValue(date);
+  })();
+  const displayName = profileForm.name || "Broker";
+  const displayEmail = profileForm.email || "No email set";
+  const displayPhone = profileForm.phone || "No phone set";
+
   return (
-    <div className="bg-white/80 shadow-sm rounded-xl border">
-      <div className="px-4 py-8 sm:p-10">
-        <h3 className="text-lg leading-6 font-bold text-gray-900 mb-6">Profile</h3>
-        <div className="space-y-4 max-w-2xl">
+    <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
+      <div className="max-w-2xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
+          <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
+            <User className="w-12 h-12 text-white" />
+          </div>
+          <div>
+            <h4 className="text-xl font-semibold text-gray-900">{displayName}</h4>
+            <p className="text-gray-600">{displayEmail}</p>
+            <p className="text-gray-600">{displayPhone}</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white/80 p-4 space-y-4">
+          <p className="text-sm font-semibold text-gray-900">Edit Profile Details</p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <input
               type="text"
               value={profileForm.name}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, name: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
           </div>
           <div>
@@ -21,7 +52,7 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
               type="email"
               value={profileForm.email}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, email: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
           </div>
           <div>
@@ -30,7 +61,7 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
               type="tel"
               value={profileForm.phone}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
           </div>
           <div>
@@ -38,7 +69,7 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
             <select
               value={profileForm.gender}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, gender: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             >
               <option value="">Prefer not to say</option>
               <option value="male">Male</option>
@@ -53,8 +84,11 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
               type="date"
               value={profileForm.dateOfBirth}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              min={minBrokerDob}
+              max={maxBrokerDob}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
+            <p className="mt-1 text-xs text-gray-500">Broker age must be between 18 and 60 years.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
@@ -62,7 +96,7 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
               rows={3}
               value={profileForm.bio}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white/80"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
               placeholder="Tell us about your experience as a broker"
             />
           </div>
@@ -76,14 +110,14 @@ function BrokerProfilePage({ profileForm, setProfileForm, profileStatus, handleP
             />
             <p className="mt-1 text-xs text-gray-500">Share this code with workers to link them to your network.</p>
           </div>
-          {profileStatus.error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{profileStatus.error}</p>}
-          {profileStatus.success && <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">{profileStatus.success}</p>}
+          {profileStatus.error && <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-700">{profileStatus.error}</p>}
+          {profileStatus.success && <p className="rounded bg-green-100 px-3 py-2 text-sm text-green-700">{profileStatus.success}</p>}
           <button
             onClick={handleProfileSave}
             disabled={profileStatus.loading}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold disabled:opacity-70"
+            className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-70"
           >
-            {profileStatus.loading ? "Saving..." : "Save Profile"}
+            {profileStatus.loading ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
