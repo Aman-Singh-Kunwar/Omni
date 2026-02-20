@@ -1,13 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from '../assets/images/omni-logo.png';
 import api from '../api';
-import CustomerHomePage from '../pages/customer/CustomerHomePage';
-import CustomerBookingFormPage from '../pages/customer/CustomerBookingFormPage';
-import CustomerBookingsPage from '../pages/customer/CustomerBookingsPage';
-import CustomerFavoritesPage from '../pages/customer/CustomerFavoritesPage';
-import CustomerProfilePage from '../pages/customer/CustomerProfilePage';
-import CustomerSettingsPage from '../pages/customer/CustomerSettingsPage';
 import {
   Bell,
   User,
@@ -32,6 +26,13 @@ import {
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
+const CustomerHomePage = lazy(() => import('../pages/customer/CustomerHomePage'));
+const CustomerBookingFormPage = lazy(() => import('../pages/customer/CustomerBookingFormPage'));
+const CustomerBookingsPage = lazy(() => import('../pages/customer/CustomerBookingsPage'));
+const CustomerFavoritesPage = lazy(() => import('../pages/customer/CustomerFavoritesPage'));
+const CustomerProfilePage = lazy(() => import('../pages/customer/CustomerProfilePage'));
+const CustomerSettingsPage = lazy(() => import('../pages/customer/CustomerSettingsPage'));
+
 const SERVICE_PRICE_MIN = 250;
 const SERVICE_PRICE_MAX = 2500;
 const SERVICE_PRICE_STEP = 50;
@@ -46,6 +47,10 @@ const BASE_SERVICES = [
   { id: 7, name: 'Hair Stylist', icon: Scissors, color: 'bg-pink-500', rating: 4.7 },
   { id: 8, name: 'Car Service', icon: Car, color: 'bg-gray-600', rating: 4.5 }
 ];
+
+function PageLoader() {
+  return <div className="rounded-xl border bg-white/70 p-6 text-sm font-medium text-gray-600">Loading section...</div>;
+}
 
 function hashServiceName(name) {
   return Array.from(String(name || '')).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0);
@@ -164,6 +169,9 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     [tabPathMap]
   );
   const activeTab = pathTabMap[location.pathname] || 'home';
+  const needsDashboardData = ['home', 'bookService', 'bookings', 'favorites'].includes(activeTab);
+  const needsWorkersData = ['home', 'bookService', 'favorites'].includes(activeTab);
+  const needsProfileData = activeTab === 'profile';
   const bookingQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return {
@@ -414,7 +422,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   }, [activeTab, bookingSource, bookingQuery.workerId]);
 
   useEffect(() => {
-    if (!authToken) {
+    if (!authToken || !needsWorkersData) {
       setAvailableWorkers([]);
       setWorkersLoading(false);
       return;
@@ -431,9 +439,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         setWorkersLoading(false);
       }
     };
-
     loadWorkers();
-  }, [authToken]);
+  }, [authToken, needsWorkersData]);
 
   useEffect(() => {
     try {
@@ -589,8 +596,11 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   };
 
   useEffect(() => {
+    if (!needsDashboardData) {
+      return;
+    }
     loadDashboard();
-  }, [authToken, userName]);
+  }, [authToken, userName, needsDashboardData]);
 
   useEffect(() => {
     const fallback = {
@@ -603,7 +613,13 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     };
 
     if (!authToken) {
-      setProfileForm(fallback);
+      if (needsProfileData) {
+        setProfileForm(fallback);
+      }
+      return;
+    }
+
+    if (!needsProfileData) {
       return;
     }
 
@@ -627,9 +643,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         setProfileForm(fallback);
       }
     };
-
     loadProfile();
-  }, [authToken, userEmail, userName]);
+  }, [authToken, userEmail, userName, needsProfileData]);
 
   const navigateToBooking = ({ source, serviceName, workerId = '' }) => {
     const params = new URLSearchParams();
@@ -1198,10 +1213,10 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         <nav ref={navRef} className="bg-white shadow-sm border-b sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-8">
+              <div className="flex items-center space-x-3 sm:space-x-8">
                 <div className="flex items-center space-x-2">
                   <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
-                  <h1 className="text-2xl font-bold text-gray-900">Omni</h1>
+                  <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Omni</h1>
                 </div>
 
                 <div className="hidden md:flex items-center space-x-1">
@@ -1406,13 +1421,15 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           )}
         </nav>
 
-        <main className="px-4 sm:px-6 py-8">
-          <div className="max-w-7xl mx-auto">{renderActivePage()}</div>
+        <main className="px-4 py-6 sm:px-6 sm:py-8">
+          <div className="max-w-7xl mx-auto">
+            <Suspense fallback={<PageLoader />}>{renderActivePage()}</Suspense>
+          </div>
         </main>
 
         {showRoleSwitchModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto backdrop-blur-md p-4 sm:items-center">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full">
               <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Switch Role</h3>
               <p className="text-gray-600 text-center mb-6">Choose the role you want to switch to</p>
 
@@ -1452,13 +1469,13 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
 
               {roleSwitchStatus.error && <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{roleSwitchStatus.error}</p>}
 
-              <div className="flex space-x-4 mt-6">
+              <div className="mt-6">
                 <button
                   onClick={() => {
                     setRoleSwitchStatus({ loading: false, error: '' });
                     setShowRoleSwitchModal(false);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
                 >
                   Cancel
                 </button>

@@ -26,7 +26,7 @@ function WorkerJobRequestsPage({ jobRequests, handleJobAction, processingJobId, 
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto">
                   <p className="text-xl font-bold text-gray-900">INR {job.amount.toLocaleString("en-IN")}</p>
-                  <div className="flex space-x-3 mt-3">
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => handleJobAction(job.id, "accept")}
                       disabled={processingJobId === job.id}

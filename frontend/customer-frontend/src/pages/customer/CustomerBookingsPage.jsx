@@ -84,7 +84,7 @@ function CustomerBookingsPage({
         {recentBookings.map((booking) => (
           <div key={booking.id} className="border p-4 sm:p-6 rounded-lg bg-white/60">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center space-x-4">
+              <div className="flex w-full min-w-0 items-center space-x-3 sm:space-x-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                   <Wrench className="w-6 h-6 text-blue-600" />
                 </div>
@@ -179,7 +179,7 @@ function CustomerBookingsPage({
                           notProvidedLoadingBookingId === booking.id ||
                           deleteLoadingBookingId === booking.id
                         }
-                        className="inline-flex h-11 items-center justify-center gap-2 w-full sm:w-auto min-w-[170px] rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-70"
+                        className="inline-flex h-11 items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-70"
                       >
                         <CreditCard className="w-4 h-4" />
                         {payLoadingBookingId === booking.id ? "Processing..." : "Pay Now"}
@@ -193,7 +193,7 @@ function CustomerBookingsPage({
                           notProvidedLoadingBookingId === booking.id ||
                           deleteLoadingBookingId === booking.id
                         }
-                        className="inline-flex h-11 items-center justify-center gap-2 w-full sm:w-auto min-w-[170px] rounded-lg bg-amber-600 px-5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-70"
+                        className="inline-flex h-11 items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-amber-600 px-5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-70"
                       >
                         <Wrench className="w-4 h-4" />
                         {notProvidedLoadingBookingId === booking.id ? "Updating..." : "Service Not Provided"}

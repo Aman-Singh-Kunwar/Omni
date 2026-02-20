@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import CustomerDashboard from "./components/CustomerDashboard";
-import CustomerAuthPage from "./components/CustomerAuthPage";
 import api from "./api";
 
 const role = "customer";
 const brokerUrl = import.meta.env.VITE_BROKER_APP_URL || "http://localhost:5175";
 const workerUrl = import.meta.env.VITE_WORKER_APP_URL || "http://localhost:5176";
 const sessionKey = "omni_customer_session";
+const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
+const CustomerAuthPage = lazy(() => import("./components/CustomerAuthPage"));
+
+function RouteLoader() {
+  return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">Loading page...</div>;
+}
 
 function getStoredSession() {
   try {
@@ -129,49 +133,51 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          authUser ? (
-            <Navigate to="/" replace />
-          ) : (
-            <CustomerAuthPage mode="login" onSuccess={handleAuthSuccess} />
-          )
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          authUser ? (
-            <Navigate to="/" replace />
-          ) : (
-            <CustomerAuthPage mode="signup" onSuccess={handleAuthSuccess} />
-          )
-        }
-      />
-
-      {dashboardPaths.map((path) => (
+    <Suspense fallback={<RouteLoader />}>
+      <Routes>
         <Route
-          key={path}
-          path={path}
+          path="/login"
           element={
-            <div onClickCapture={handleGuestInteraction}>
-              <CustomerDashboard
-                brokerUrl={brokerUrl}
-                workerUrl={workerUrl}
-                userName={authUser?.name || "Guest Customer"}
-                userEmail={authUser?.email || ""}
-                authToken={authToken}
-                onLogout={handleLogout}
-              />
-            </div>
+            authUser ? (
+              <Navigate to="/" replace />
+            ) : (
+              <CustomerAuthPage mode="login" onSuccess={handleAuthSuccess} />
+            )
           }
         />
-      ))}
+        <Route
+          path="/signup"
+          element={
+            authUser ? (
+              <Navigate to="/" replace />
+            ) : (
+              <CustomerAuthPage mode="signup" onSuccess={handleAuthSuccess} />
+            )
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {dashboardPaths.map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <div onClickCapture={handleGuestInteraction}>
+                <CustomerDashboard
+                  brokerUrl={brokerUrl}
+                  workerUrl={workerUrl}
+                  userName={authUser?.name || "Guest Customer"}
+                  userEmail={authUser?.email || ""}
+                  authToken={authToken}
+                  onLogout={handleLogout}
+                />
+              </div>
+            }
+          />
+        ))}
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

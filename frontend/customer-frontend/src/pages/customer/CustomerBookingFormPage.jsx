@@ -100,7 +100,7 @@ function CustomerBookingFormPage({
 
   return (
     <div className="rounded-xl border bg-white/80 p-6 sm:p-8 shadow-sm">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-2xl font-bold text-gray-900">{bookingSource === "service" ? `Book ${selectedService.name}` : "Book Worker"}</h3>
           <p className="text-gray-600">
@@ -208,7 +208,7 @@ function CustomerBookingFormPage({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Preferred Time</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <select
               value={timeParts.hour}
               onChange={(event) => updateTimePart({ hour: event.target.value })}
@@ -269,7 +269,7 @@ function CustomerBookingFormPage({
         {bookingStatus.error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{bookingStatus.error}</p>}
       </div>
 
-      <div className="mt-6 flex gap-4">
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-4">
         <button
           type="button"
           onClick={onBack}

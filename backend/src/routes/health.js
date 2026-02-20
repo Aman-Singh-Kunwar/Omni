@@ -2,6 +2,7 @@ import express from "express";
 const router = express.Router();
 
 router.get("/health", (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json({
     ok: true,
     service: "backend",
@@ -10,6 +11,7 @@ router.get("/health", (_req, res) => {
 });
 
 router.get("/config", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
   res.json({
     apps: {
       landing: process.env.LANDING_APP_URL || "http://localhost:5173",

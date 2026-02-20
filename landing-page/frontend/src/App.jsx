@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import LandingPage from "./components/LandingPage";
-import AuthPage from "./components/AuthPage";
 
 const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const LandingPage = lazy(() => import("./components/LandingPage"));
+const AuthPage = lazy(() => import("./components/AuthPage"));
 
 const defaultConfig = {
   apps: {
@@ -42,12 +42,14 @@ function App() {
   };
 
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<AuthPage mode="login" {...routeProps} />} />
-      <Route path="/signup" element={<AuthPage mode="signup" {...routeProps} />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">Loading page...</div>}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<AuthPage mode="login" {...routeProps} />} />
+        <Route path="/signup" element={<AuthPage mode="signup" {...routeProps} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

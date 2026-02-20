@@ -34,8 +34,8 @@ function BrokerOverviewPage({ stats, topWorkers }) {
             <h3 className="text-lg leading-6 font-bold text-gray-900 mb-4">Top Performing Workers</h3>
             <div className="space-y-3">
               {topWorkers.map((worker) => (
-                <div key={worker.id} className="flex items-center justify-between p-3 bg-gray-50/80 rounded-lg">
-                  <div className="flex items-center">
+                <div key={worker.id} className="flex flex-col gap-3 rounded-lg bg-gray-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center">
                     <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
                       <span className="text-sm font-medium text-gray-700">{worker.name.charAt(0)}</span>
                     </div>
@@ -44,11 +44,11 @@ function BrokerOverviewPage({ stats, topWorkers }) {
                       <p className="text-sm text-gray-500">{worker.service}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <p className="text-sm font-semibold text-emerald-700">
                       INR {Number(worker.brokerCommission || 0).toLocaleString("en-IN")}
                     </p>
-                    <p className="text-sm font-medium text-gray-900 flex items-center justify-end">
+                    <p className="flex items-center text-sm font-medium text-gray-900 sm:justify-end">
                       <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" /> {worker.rating}
                     </p>
                     <p className="text-sm text-gray-500">{worker.jobs} jobs</p>

@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get("/customer/dashboard", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     const requestedCustomerName = String(req.query.customer || "").trim();
     const isAuthCustomer = authUser?.role === "customer";

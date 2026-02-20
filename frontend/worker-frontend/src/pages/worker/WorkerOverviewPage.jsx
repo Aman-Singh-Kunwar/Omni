@@ -50,7 +50,7 @@ function WorkerOverviewPage({ stats, jobRequests, recentJobs, setActiveTab, hand
                     </div>
                     <p className="text-sm font-bold text-gray-900">INR {job.amount.toLocaleString("en-IN")}</p>
                   </div>
-                  <div className="flex space-x-2 mt-3">
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <button
                       onClick={() => handleJobAction(job.id, "accept")}
                       disabled={processingJobId === job.id}
@@ -79,12 +79,12 @@ function WorkerOverviewPage({ stats, jobRequests, recentJobs, setActiveTab, hand
             <h3 className="text-lg leading-6 font-bold text-gray-900 mb-4">Recent Completed Jobs</h3>
             <div className="space-y-3">
               {recentJobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50/80 rounded-lg">
+                <div key={job.id} className="flex flex-col gap-3 rounded-lg bg-gray-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{job.customer}</p>
                     <p className="text-sm text-gray-500">{job.service}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <p className="text-sm font-medium text-gray-900">INR {job.amount.toLocaleString("en-IN")}</p>
                     <div className="flex items-center justify-end text-sm text-gray-500">
                       <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />

@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get("/worker/dashboard", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     const requestedWorkerName = String(req.query.worker || "").trim();
     const isAuthWorker = authUser?.role === "worker";
@@ -91,6 +92,7 @@ router.get("/worker/dashboard", async (req, res, next) => {
 
 router.get("/worker/reviews", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     const requestedWorkerName = String(req.query.worker || "").trim();
     const isAuthWorker = authUser?.role === "worker";

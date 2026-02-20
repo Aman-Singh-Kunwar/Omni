@@ -83,7 +83,7 @@ function BrokerWorkersPage({ authToken }) {
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <div className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <div className="rounded-md bg-gray-50 px-3 py-2">
                   <p className="text-gray-500">Total Jobs</p>
                   <p className="font-semibold text-gray-900">{worker.totalJobs || 0}</p>

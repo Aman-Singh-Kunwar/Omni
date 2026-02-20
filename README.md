@@ -159,6 +159,11 @@ WORKER_APP_URL=http://localhost:5176
 MAIN_API_URL=http://localhost:5000/api
 JWT_SECRET=replace-with-a-strong-secret
 SYNC_INDEXES=true
+MAIL_USER=your-gmail-address@gmail.com
+MAIL_APP_PASSWORD=your-16-char-gmail-app-password
+MAIL_FROM=your-gmail-address@gmail.com
+SIGNUP_VERIFICATION_EXPIRY_MINUTES=10
+FORGOT_PASSWORD_EXPIRY_MINUTES=10
 ```
 
 Variable reference:
@@ -172,6 +177,11 @@ Variable reference:
 - `MAIN_API_URL`: API base URL returned by `/api/config`.
 - `JWT_SECRET`: signing secret for JWT tokens.
 - `SYNC_INDEXES`: optional. If set to `false`, backend skips `mongoose.syncIndexes()` at startup.
+- `MAIL_USER`: Gmail address used to send verification emails.
+- `MAIL_APP_PASSWORD`: Gmail app password for `MAIL_USER`.
+- `MAIL_FROM`: optional sender address shown in outgoing emails.
+- `SIGNUP_VERIFICATION_EXPIRY_MINUTES`: optional OTP expiry window for signup verification.
+- `FORGOT_PASSWORD_EXPIRY_MINUTES`: optional OTP expiry window for forgot-password verification.
 
 ### 2) Landing frontend `.env`
 
@@ -190,6 +200,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_BROKER_APP_URL=http://localhost:5175
 VITE_WORKER_APP_URL=http://localhost:5176
+VITE_PAGE_CACHE_TTL_MS=30000
 ```
 
 ### 4) Broker frontend `.env`
@@ -201,6 +212,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_CUSTOMER_APP_URL=http://localhost:5174
 VITE_WORKER_APP_URL=http://localhost:5176
+VITE_PAGE_CACHE_TTL_MS=30000
 ```
 
 ### 5) Worker frontend `.env`
@@ -212,7 +224,12 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_CUSTOMER_APP_URL=http://localhost:5174
 VITE_BROKER_APP_URL=http://localhost:5175
+VITE_PAGE_CACHE_TTL_MS=30000
 ```
+
+Frontend cache reference:
+
+- `VITE_PAGE_CACHE_TTL_MS`: optional GET-response cache TTL (milliseconds) for faster page reloads in customer/broker/worker apps.
 
 ## Run the Project Locally
 
@@ -277,8 +294,13 @@ This runs `build` for all workspaces where the script exists.
 
 - Signup/login endpoints:
   - `POST /api/auth/signup`
+  - `POST /api/auth/signup/verify`
+  - `POST /api/auth/forgot-password/request`
+  - `POST /api/auth/forgot-password/verify`
   - `POST /api/auth/login`
 - On success, backend returns user + JWT token.
+- Signup now requires email verification: first call `/auth/signup`, then verify OTP with `/auth/signup/verify`.
+- Forgot password flow uses email OTP: request code, then verify and set a new password.
 - Role apps verify token using `GET /api/auth/me`.
 - Session is stored in localStorage per role app.
 
@@ -316,6 +338,9 @@ Core routes:
 
 - Auth:
   - `POST /auth/signup`
+  - `POST /auth/signup/verify`
+  - `POST /auth/forgot-password/request`
+  - `POST /auth/forgot-password/verify`
   - `POST /auth/login`
   - `GET /auth/me`
   - `POST /auth/switch-role`

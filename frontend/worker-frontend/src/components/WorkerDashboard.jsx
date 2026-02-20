@@ -1,17 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from "../assets/images/omni-logo.png";
 import api from "../api";
-import WorkerOverviewPage from "../pages/worker/WorkerOverviewPage";
-import WorkerJobRequestsPage from "../pages/worker/WorkerJobRequestsPage";
-import WorkerSchedulePage from "../pages/worker/WorkerSchedulePage";
-import WorkerEarningsPage from "../pages/worker/WorkerEarningsPage";
-import WorkerReviewsPage from "../pages/worker/WorkerReviewsPage";
-import WorkerProfilePage from "../pages/worker/WorkerProfilePage";
-import WorkerSettingsPage from "../pages/worker/WorkerSettingsPage";
 import { Bell, Settings, Menu, X, User, ChevronDown, Briefcase, LogOut } from "lucide-react";
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
+
+const WorkerOverviewPage = lazy(() => import("../pages/worker/WorkerOverviewPage"));
+const WorkerJobRequestsPage = lazy(() => import("../pages/worker/WorkerJobRequestsPage"));
+const WorkerSchedulePage = lazy(() => import("../pages/worker/WorkerSchedulePage"));
+const WorkerEarningsPage = lazy(() => import("../pages/worker/WorkerEarningsPage"));
+const WorkerReviewsPage = lazy(() => import("../pages/worker/WorkerReviewsPage"));
+const WorkerProfilePage = lazy(() => import("../pages/worker/WorkerProfilePage"));
+const WorkerSettingsPage = lazy(() => import("../pages/worker/WorkerSettingsPage"));
+
+function PageLoader() {
+  return <div className="rounded-xl border bg-white/70 p-6 text-sm font-medium text-gray-600">Loading section...</div>;
+}
 
 const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Worker", userEmail = "", authToken = "" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -70,6 +75,8 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
   };
   const pathTabMap = Object.fromEntries(Object.entries(tabPathMap).map(([tab, path]) => [path, tab]));
   const activeTab = pathTabMap[location.pathname] || "overview";
+  const needsDashboardData = !["profile", "settings"].includes(activeTab);
+  const needsProfileData = activeTab === "profile";
 
   const navTabs = ["overview", "job-requests", "schedule", "earnings", "reviews"];
   const notificationItems = useMemo(() => {
@@ -273,11 +280,14 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
   };
 
   useEffect(() => {
+    if (!needsDashboardData) {
+      return;
+    }
     loadDashboard();
-  }, [authToken, userName]);
+  }, [authToken, userName, needsDashboardData]);
 
   useEffect(() => {
-    if (!authToken) {
+    if (!authToken || !needsDashboardData) {
       return;
     }
 
@@ -286,7 +296,7 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     }, 15000);
 
     return () => window.clearInterval(intervalId);
-  }, [authToken, userName]);
+  }, [authToken, userName, needsDashboardData]);
 
   useEffect(() => {
     const fallback = {
@@ -305,7 +315,13 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     };
 
     if (!authToken) {
-      setProfileForm(fallback);
+      if (needsProfileData) {
+        setProfileForm(fallback);
+      }
+      return;
+    }
+
+    if (!needsProfileData) {
       return;
     }
 
@@ -337,7 +353,7 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     };
 
     loadProfile();
-  }, [authToken, userEmail, userName]);
+  }, [authToken, userEmail, userName, needsProfileData]);
 
   const handleJobAction = async (jobId, action) => {
     if (!authToken) {
@@ -582,10 +598,13 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
         <nav ref={navRef} className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-8">
+              <div className="flex items-center space-x-3 sm:space-x-8">
                 <div className="flex items-center">
                   <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
-                  <h1 className="text-2xl font-bold text-gray-900">Omni Worker</h1>
+                  <h1 className="text-lg font-bold text-gray-900 sm:text-2xl">
+                    <span>Omni</span>
+                    <span className="hidden sm:inline"> Worker</span>
+                  </h1>
                 </div>
                 <div className="hidden lg:flex space-x-8">
                   {navTabs.map((tab) => (
@@ -786,12 +805,14 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
         </nav>
 
         <main className="py-6 sm:py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">{renderActivePage()}</div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Suspense fallback={<PageLoader />}>{renderActivePage()}</Suspense>
+          </div>
         </main>
 
         {showRoleSwitchModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto backdrop-blur-md p-4 sm:items-center">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full">
               <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Switch Role</h3>
               <p className="text-gray-600 text-center mb-6">Choose the role you want to switch to</p>
 
@@ -831,13 +852,13 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
 
               {roleSwitchStatus.error && <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{roleSwitchStatus.error}</p>}
 
-              <div className="flex space-x-4 mt-6">
+              <div className="mt-6">
                 <button
                   onClick={() => {
                     setRoleSwitchStatus({ loading: false, error: "" });
                     setShowRoleSwitchModal(false);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
                 >
                   Cancel
                 </button>

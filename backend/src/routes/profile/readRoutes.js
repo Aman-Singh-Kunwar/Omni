@@ -11,6 +11,7 @@ const router = express.Router();
 
 router.get("/profile", requireAuth, async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const payload = toProfileDto(req.authUser);
     if (req.authUser.role === "worker") {
       const enrichedProfile = await enrichWorkerProfile(req.authUser, payload.profile);

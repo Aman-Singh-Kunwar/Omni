@@ -19,6 +19,7 @@ function buildBrokerAttributionScope(authUser, brokerCode = "") {
 
 router.get("/broker/dashboard", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     if (!authUser || authUser.role !== "broker") {
       return res.json({
@@ -168,6 +169,7 @@ router.get("/broker/dashboard", async (req, res, next) => {
 
 router.get("/broker/workers", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     if (!authUser || authUser.role !== "broker") {
       return res.json({ brokerCode: "", workers: [] });
@@ -277,6 +279,7 @@ router.get("/broker/workers", async (req, res, next) => {
 
 router.get("/broker/bookings", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const authUser = await readAuthUserFromRequest(req);
     if (!authUser || authUser.role !== "broker") {
       return res.json({ brokerCode: "", bookings: [] });

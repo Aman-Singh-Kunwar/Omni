@@ -70,7 +70,7 @@ function CustomerHomePage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
           <div className="bg-white/80 p-6 rounded-xl shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
@@ -144,12 +144,12 @@ function CustomerHomePage({
             {visibleProviders.map((provider) => (
               <div key={provider.id} className="bg-white/80 p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow border">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-4">
+                  <div className="flex min-w-0 items-center space-x-3 sm:space-x-4">
                     <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-base font-semibold text-gray-700">
                       {provider.image}
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">{provider.name}</h4>
+                      <h4 className="font-semibold text-gray-900 break-words">{provider.name}</h4>
                       <p className="text-sm text-gray-600">
                         {Array.isArray(provider.servicesProvided) && provider.servicesProvided.length
                           ? provider.servicesProvided.join(", ")

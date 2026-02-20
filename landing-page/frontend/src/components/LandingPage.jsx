@@ -81,7 +81,7 @@ function LandingPage() {
 
         <section className="py-20 sm:py-24 px-4">
           <div className="max-w-7xl mx-auto text-center">
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
               Your <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Omni</span> Service Platform
             </h2>
             <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
@@ -130,7 +130,7 @@ function LandingPage() {
                       ))}
                     </ul>
 
-                    <div className="mt-auto grid grid-cols-2 gap-3">
+                    <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <button
                         type="button"
                         onClick={() => navigate(`/login?role=${role.id}`)}
