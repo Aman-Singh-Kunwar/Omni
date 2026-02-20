@@ -313,6 +313,12 @@ This runs `build` for all workspaces where the script exists.
 - On success, backend returns user + JWT token.
 - Signup now requires email verification: first call `/auth/signup`, then verify OTP with `/auth/signup/verify`.
 - Forgot password flow uses email OTP: request code, then verify and set a new password.
+- Email notifications sent by backend:
+  - Signup verification OTP email.
+  - Signup success/welcome email after verification.
+  - Forgot-password OTP email.
+  - Password reset success email.
+  - Account deletion confirmation email.
 - Role apps verify token using `GET /api/auth/me`.
 - Session is stored in localStorage per role app.
 
@@ -322,6 +328,7 @@ This runs `build` for all workspaces where the script exists.
 - Role apps support dedicated `/login` and `/signup` routes.
 - If a user is unauthenticated, interactive actions route to login pages.
 - Role switching is supported via `POST /api/auth/switch-role`.
+- Dashboard logo image + logo text in role apps navigate to the landing app (`VITE_LANDING_APP_URL` with local/prod fallback).
 
 ### 4) Booking Lifecycle (high level)
 
@@ -338,11 +345,25 @@ This runs `build` for all workspaces where the script exists.
 - Worker profile can attach to broker via broker code.
 - Broker dashboards aggregate linked worker data and completed booking commissions.
 
+### 6) Dashboard UX Behavior
+
+- Mobile nav uses a 3-dot menu for route sections only.
+- Profile menu is separate on mobile and contains account actions (profile/switch role/logout).
+- Quick menus (notification/profile/mobile-nav) auto-collapse on outside click/tap, `Escape`, resize, blur, route changes, and real scroll movement.
+- Scroll auto-collapse includes a small mobile jitter guard so menus still open reliably at any scroll position.
+- Modal overlays use blur backgrounds (`backdrop-blur`) across auth/role-switch flows.
+- Settings header includes a plain text navigation link: `← back to dashboard`.
+- Browser tab icon (favicon) uses the Omni logo in landing + all role apps.
+
 ## API Overview
 
 Main route prefix: `/api`
 
 Core routes:
+
+- Root:
+  - `GET /` (returns HTML UI for browser requests, JSON for API clients)
+  - `GET /api` (returns HTML UI for browser requests, JSON for API clients)
 
 - Health/config:
   - `GET /health`
@@ -426,6 +447,11 @@ Core routes:
 
 - Confirm `VITE_API_URL` values point to `http://localhost:5000/api`.
 - Confirm backend is running before opening frontends.
+
+### Logo/Favicon not updating in browser
+
+- Browser favicon and static logo assets are aggressively cached.
+- Use a hard refresh (`Ctrl+F5`) after deploy/update.
 
 ### Empty dashboards
 

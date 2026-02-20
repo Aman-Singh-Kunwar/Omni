@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api";
 import { toBooleanOrDefault, toShortErrorMessage } from "@shared/utils/common";
 import NotificationSettingsSection from "@shared/settings/NotificationSettingsSection";
@@ -31,6 +32,7 @@ function normalizeSettings(value) {
 }
 
 function WorkerSettingsPage({ onLogout, authToken, userName = "" }) {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
   const [showNotificationsForm, setShowNotificationsForm] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState({ loading: false, error: "", success: "" });
@@ -180,8 +182,14 @@ function WorkerSettingsPage({ onLogout, authToken, userName = "" }) {
 
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Settings</h3>
-      <div className="space-y-6 max-w-2xl mx-auto">
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h3 className="text-xl font-bold text-gray-900">Settings</h3>
+          <button type="button" onClick={() => navigate("/")} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+            {"← back to dashboard"}
+          </button>
+        </div>
+        <div className="space-y-6">
         <div className="border rounded-lg p-6 bg-white/60">
           <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
           <NotificationSettingsSection
@@ -220,6 +228,7 @@ function WorkerSettingsPage({ onLogout, authToken, userName = "" }) {
           setDeleteStatus={setDeleteStatus}
           onDeleteAccount={handleDeleteAccount}
         />
+      </div>
       </div>
     </div>
   );

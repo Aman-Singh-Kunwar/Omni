@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from "../assets/images/omni-logo.png";
 import api from "../api";
-import { Bell, Settings, Menu, X, User, ChevronDown, LogOut, Briefcase, Wrench } from "lucide-react";
+import { Bell, Settings, MoreVertical, X, User, ChevronDown, LogOut, Briefcase, Wrench } from "lucide-react";
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
@@ -16,6 +16,8 @@ const BrokerSettingsPage = lazy(() => import("../pages/broker/BrokerSettingsPage
 function PageLoader() {
   return <div className="rounded-xl border bg-white/70 p-6 text-sm font-medium text-gray-600">Loading section...</div>;
 }
+const defaultLandingUrl = import.meta.env.PROD ? "https://omni-landing-page.onrender.com" : "http://localhost:5173";
+const landingUrl = import.meta.env.VITE_LANDING_APP_URL || defaultLandingUrl;
 
 const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah Broker", userEmail = "", authToken = "" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -469,13 +471,18 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-3 sm:space-x-8">
-                <div className="flex items-center">
+                <a
+                  href={landingUrl}
+                  data-public-navigation="true"
+                  className="flex items-center transition-opacity hover:opacity-90"
+                  aria-label="Go to Omni landing page"
+                >
                   <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
                   <h1 className="text-lg font-bold text-gray-900 sm:text-2xl">
                     <span>Omni</span>
                     <span className="hidden sm:inline"> Broker</span>
                   </h1>
-                </div>
+                </a>
                 <div className="hidden lg:flex space-x-8">
                   {navTabs.map((tab) => (
                     <button
@@ -510,12 +517,12 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                     </span>
                   </button>
                   {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-[22rem] max-w-[90vw] bg-white rounded-lg shadow-lg border z-50">
+                    <div className="fixed left-14 right-2 top-16 z-50 overflow-hidden rounded-lg border bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]">
                       <div className="px-4 py-3 border-b flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">Notifications</p>
                         <span className="text-xs text-gray-500">{unreadNotificationCount} unread</span>
                       </div>
-                      <div className="h-[216px] overflow-y-auto">
+                      <div className="h-44 overflow-y-auto">
                         {visibleNotificationItems.length ? (
                           visibleNotificationItems.map((notification) => {
                             const normalizedNotificationId = toStableId(notification.id);
@@ -540,18 +547,18 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                           <p className="px-4 py-6 text-sm text-gray-500">No notifications.</p>
                         )}
                       </div>
-                      <div className="px-4 py-2 border-t flex items-center justify-between">
+                      <div className="border-t px-3 py-2 grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={handleMarkAllNotificationsRead}
-                          className="text-xs font-medium text-green-600 hover:text-green-700"
+                          className="rounded-md border border-green-200 bg-green-50 px-2 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"
                         >
                           Mark all read
                         </button>
                         <button
                           type="button"
                           onClick={handleClearNotifications}
-                          className="text-xs font-medium text-red-600 hover:text-red-700"
+                          className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                         >
                           Clear notifications
                         </button>
@@ -582,8 +589,22 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                     <ChevronDown className="w-4 h-4 text-gray-500" />
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setIsMobileMenuOpen(false);
+                      setShowUserMenu((prev) => !prev);
+                    }}
+                    className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
+                    aria-label="Open profile menu"
+                  >
+                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                  </button>
+
                   {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
+                    <div className="fixed right-2 top-16 w-44 bg-white rounded-md shadow-lg py-1 z-50 border sm:absolute sm:right-0 sm:top-auto sm:mt-2 sm:w-48">
                       <button
                         onClick={() => {
                           navigateToTab("profile");
@@ -626,7 +647,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                   }}
                   className="lg:hidden p-2 text-gray-500"
                 >
-                  {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                  {isMobileMenuOpen ? <X className="h-6 w-6" /> : <MoreVertical className="h-6 w-6" />}
                 </button>
               </div>
             </div>
@@ -649,26 +670,6 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
                     {tab === "overview" ? "dashboard" : tab.replace("-", " ")}
                   </button>
                 ))}
-                <div className="border-t pt-2 mt-2">
-                  <button
-                    onClick={() => {
-                      setRoleSwitchStatus({ loading: false, error: "" });
-                      setShowRoleSwitchModal(true);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                  >
-                    <Briefcase className="w-5 h-5" />
-                    <span>Switch Role</span>
-                  </button>
-                  <button
-                    onClick={onLogout}
-                    className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50 hover:text-red-800"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span>Logout</span>
-                  </button>
-                </div>
               </div>
             </div>
           )}

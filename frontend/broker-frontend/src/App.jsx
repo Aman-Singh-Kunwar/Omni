@@ -95,6 +95,11 @@ function App() {
       return;
     }
 
+    const allowGuestNavigation = event.target.closest("[data-public-navigation='true']");
+    if (allowGuestNavigation) {
+      return;
+    }
+
     const interactive = event.target.closest("button,input,select,textarea,a,.cursor-pointer,[role='button']");
     if (!interactive) {
       return;

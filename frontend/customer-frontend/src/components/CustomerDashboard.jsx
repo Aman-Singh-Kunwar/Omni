@@ -18,7 +18,7 @@ import {
   Wind,
   Scissors,
   Car,
-  Menu,
+  MoreVertical,
   X,
   ChevronDown,
   Briefcase
@@ -36,6 +36,8 @@ const CustomerSettingsPage = lazy(() => import('../pages/customer/CustomerSettin
 const SERVICE_PRICE_MIN = 250;
 const SERVICE_PRICE_MAX = 2500;
 const SERVICE_PRICE_STEP = 50;
+const defaultLandingUrl = import.meta.env.PROD ? "https://omni-landing-page.onrender.com" : "http://localhost:5173";
+const landingUrl = import.meta.env.VITE_LANDING_APP_URL || defaultLandingUrl;
 
 const BASE_SERVICES = [
   { id: 1, name: 'Plumber', icon: Droplets, color: 'bg-blue-500', rating: 4.8 },
@@ -1214,10 +1216,15 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-3 sm:space-x-8">
-                <div className="flex items-center space-x-2">
+                <a
+                  href={landingUrl}
+                  data-public-navigation="true"
+                  className="flex items-center space-x-2 transition-opacity hover:opacity-90"
+                  aria-label="Go to Omni landing page"
+                >
                   <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
                   <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Omni</h1>
-                </div>
+                </a>
 
                 <div className="hidden md:flex items-center space-x-1">
                   {navItems.map((item) => (
@@ -1254,12 +1261,12 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                     </span>
                   </button>
                   {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-[22rem] max-w-[90vw] bg-white rounded-lg shadow-lg border z-50">
+                    <div className="fixed left-14 right-2 top-16 z-50 overflow-hidden rounded-lg border bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]">
                       <div className="px-4 py-3 border-b flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">Notifications</p>
                         <span className="text-xs text-gray-500">{unreadNotificationCount} unread</span>
                       </div>
-                      <div className="h-[216px] overflow-y-auto">
+                      <div className="h-44 overflow-y-auto">
                         {visibleNotificationItems.length ? (
                           visibleNotificationItems.map((notification) => {
                             const normalizedNotificationId = toStableId(notification.id);
@@ -1284,18 +1291,18 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                           <p className="px-4 py-6 text-sm text-gray-500">No notifications.</p>
                         )}
                       </div>
-                      <div className="px-4 py-2 border-t flex items-center justify-between">
+                      <div className="border-t px-3 py-2 grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={handleMarkAllNotificationsRead}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                          className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                         >
                           Mark all read
                         </button>
                         <button
                           type="button"
                           onClick={handleClearNotifications}
-                          className="text-xs font-medium text-red-600 hover:text-red-700"
+                          className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                         >
                           Clear notifications
                         </button>
@@ -1326,8 +1333,22 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                     <ChevronDown className="w-4 h-4 text-gray-500" />
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setShowMobileMenu(false);
+                      setShowUserMenu((prev) => !prev);
+                    }}
+                    className="md:hidden p-2 text-gray-500 hover:text-gray-700"
+                    aria-label="Open profile menu"
+                  >
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                  </button>
+
                   {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
+                    <div className="fixed right-2 top-16 w-44 bg-white rounded-md shadow-lg py-1 z-50 border sm:absolute sm:right-0 sm:top-auto sm:mt-2 sm:w-48">
                       <button
                         onClick={() => {
                           navigateToTab('profile');
@@ -1370,7 +1391,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                   }}
                   className="md:hidden p-2 text-gray-500"
                 >
-                  {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                  {showMobileMenu ? <X className="h-6 w-6" /> : <MoreVertical className="h-6 w-6" />}
                 </button>
               </div>
             </div>
@@ -1396,26 +1417,6 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                     <span>{item.name}</span>
                   </button>
                 ))}
-                <div className="border-t pt-2 mt-2">
-                  <button
-                    onClick={() => {
-                      setRoleSwitchStatus({ loading: false, error: '' });
-                      setShowRoleSwitchModal(true);
-                      setShowMobileMenu(false);
-                    }}
-                    className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                  >
-                    <Briefcase className="w-5 h-5" />
-                    <span>Switch Role</span>
-                  </button>
-                  <button
-                    onClick={onLogout}
-                    className="w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50 hover:text-red-800"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span>Logout</span>
-                  </button>
-                </div>
               </div>
             </div>
           )}

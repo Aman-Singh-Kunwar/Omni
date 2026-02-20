@@ -5,16 +5,22 @@
 2. Token handoff flow (`?authToken=...`) from landing to role apps with `/auth/me` validation.
 3. Per-role local session persistence (`customer`, `worker`, `broker`) with logout cleanup.
 4. Guest preview mode with auto-redirect to login when clicking interactive actions.
-5. Auto-collapse quick menus for notifications, profile menu, and mobile 3-line navbar menu.
+5. Auto-collapse quick menus for notifications, profile menu, and mobile 3-dot navbar menu.
 6. Auto-collapse triggers include scroll, resize, window blur, outside click/tap, `Escape`, and route change.
-7. Notification dropdowns support unread badge, single-item read, mark-all-read, and clear notifications.
-8. Notification read/cleared state is persisted in localStorage per user/role.
-9. Role switch modal in each dashboard (calls `/auth/switch-role`) and redirects with fresh token.
-10. Collapsible edit sections used across profile and settings forms.
-11. Success and error states shown with green/red banners in UI.
-12. Success collapse behavior after updates (profile, notification settings, password update).
-13. Short error message helper to avoid very long UI error strings.
-14. Backend logs success/warn/error events for key account actions and API failures.
+7. Scroll auto-collapse uses a small mobile jitter guard so menu open actions are not immediately closed while still collapsing on real scroll movement.
+8. Notification dropdowns support unread badge, single-item read, mark-all-read, and clear notifications.
+9. Notification read/cleared state is persisted in localStorage per user/role.
+10. Role switch modal in each dashboard (calls `/auth/switch-role`) and redirects with fresh token.
+11. Collapsible edit sections used across profile and settings forms.
+12. Success and error states shown with green/red banners in UI.
+13. Success collapse behavior after updates (profile, notification settings, password update).
+14. Short error message helper to avoid very long UI error strings.
+15. Dashboard logo image and logo text navigate to landing app URL (`VITE_LANDING_APP_URL`) in each role app.
+16. Browser favicon uses Omni logo across landing and all role apps.
+17. Modal overlays use blur backgrounds (`backdrop-blur`) instead of opaque dark overlays.
+18. Mobile nav keeps section links in 3-dot menu and account actions in profile dropdown for cleaner UX.
+19. Settings header uses plain text back navigation (`← back to dashboard`) aligned with title.
+20. Backend logs success/warn/error events for key account actions and API failures.
 
 ## Landing Frontend
 1. Public role cards for customer, worker, and broker with direct login/signup actions.
@@ -27,6 +33,7 @@
 8. Successful auth redirects user to selected role app with auth token.
 9. Service showcase, trust sections, and footer contact/location content.
 10. Responsive layout for desktop/mobile.
+11. Omni logo favicon in browser tab.
 
 ## Customer Frontend
 1. Dashboard tabs: Home, Book Service, Bookings, Favorites, Profile, Settings.
@@ -54,6 +61,11 @@
 23. Profile editor for name, email, phone, gender, DOB, bio.
 24. Customer DOB rule in UI (`>10 years`) and backend validation.
 25. Settings include notification preferences, account password update, logout, and delete account.
+26. Mobile 3-dot menu opens section navigation only (no account actions).
+27. Mobile profile icon opens profile menu (profile, switch role, logout).
+28. Notification dropdown tuned for compact mobile layout with right-side anchoring and action buttons.
+29. Settings header keeps `Settings` and `← back to dashboard` on one aligned row within centered content width.
+30. Logo image/text in header routes to landing page URL.
 
 ## Worker Frontend
 1. Dashboard tabs: Overview, Job Requests, Schedule, Earnings, Reviews, Profile, Settings.
@@ -73,6 +85,11 @@
 15. Broker-linked info shown in profile: broker code (read-only), broker name, commission usage.
 16. Broker code is locked in profile and cannot be edited after signup.
 17. Settings include notification preferences, account password update, logout, and delete account.
+18. Mobile 3-dot menu opens section navigation only (no account actions).
+19. Mobile profile icon opens profile menu (profile, switch role, logout).
+20. Notification dropdown tuned for compact mobile layout with right-side anchoring and action buttons.
+21. Settings header keeps `Settings` and `← back to dashboard` on one aligned row within centered content width.
+22. Logo image/text in header routes to landing page URL.
 
 ## Broker Frontend
 1. Dashboard tabs: Overview, Workers, Bookings, Earnings, Profile, Settings.
@@ -89,6 +106,11 @@
 12. Broker DOB rule in UI (`18-60`) and backend validation.
 13. Broker code displayed read-only for sharing with workers.
 14. Settings include notification preferences, account password update, logout, and delete account.
+15. Mobile 3-dot menu opens section navigation only (no account actions).
+16. Mobile profile icon opens profile menu (profile, switch role, logout).
+17. Notification dropdown tuned for compact mobile layout with right-side anchoring and action buttons.
+18. Settings header keeps `Settings` and `← back to dashboard` on one aligned row within centered content width.
+19. Logo image/text in header routes to landing page URL.
 
 ## Backend Features Supporting Frontends
 1. Modular route structure (`auth`, `profile`, `customer`, `worker`, `broker`, `catalog`, `health`).
@@ -111,3 +133,8 @@
 18. Worker deleted-credentials flow sets availability false so deleted workers are excluded from active listings.
 19. Account/profile sync helper keeps shared name/email/password/common profile fields aligned across same-email role-family users.
 20. Structured backend logging for success actions and short failure reasons.
+21. Signup + forgot-password OTP is persisted in dedicated pending collections with DB expiry indexes and attempt controls.
+22. OTP expiry windows are configurable via env (`SIGNUP_VERIFICATION_EXPIRY_MINUTES`, `FORGOT_PASSWORD_EXPIRY_MINUTES`).
+23. Professional HTML/text email templates for signup verification, signup success, forgot-password code, password reset success, and account deletion confirmation.
+24. Nodemailer Gmail transport is cached and reused; missing mail credentials return explicit configuration errors.
+25. Root API endpoints (`/` and `/api`) provide browser-friendly HTML status pages and JSON payloads for programmatic clients.
