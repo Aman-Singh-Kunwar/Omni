@@ -1,16 +1,17 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const defaultApiBase = import.meta.env.PROD ? "https://omni-backend-4t7s.onrender.com/api" : "http://localhost:5000/api";
+const apiBase = import.meta.env.VITE_API_URL || defaultApiBase;
 const LandingPage = lazy(() => import("./components/LandingPage"));
 const AuthPage = lazy(() => import("./components/AuthPage"));
 
 const defaultConfig = {
   apps: {
-    landing: "http://localhost:5173",
-    customer: "http://localhost:5174",
-    broker: "http://localhost:5175",
-    worker: "http://localhost:5176"
+    landing: import.meta.env.PROD ? "https://omni-landing-page.onrender.com" : "http://localhost:5173",
+    customer: import.meta.env.PROD ? "https://omni-customer.onrender.com" : "http://localhost:5174",
+    broker: import.meta.env.PROD ? "https://omni-broker.onrender.com" : "http://localhost:5175",
+    worker: import.meta.env.PROD ? "https://omni-worker.onrender.com" : "http://localhost:5176"
   }
 };
 

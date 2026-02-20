@@ -183,6 +183,14 @@ Variable reference:
 - `SIGNUP_VERIFICATION_EXPIRY_MINUTES`: optional OTP expiry window for signup verification.
 - `FORGOT_PASSWORD_EXPIRY_MINUTES`: optional OTP expiry window for forgot-password verification.
 
+Render production URL values (recommended):
+
+- `LANDING_APP_URL=https://omni-landing-page.onrender.com`
+- `CUSTOMER_APP_URL=https://omni-customer.onrender.com`
+- `BROKER_APP_URL=https://omni-broker.onrender.com`
+- `WORKER_APP_URL=https://omni-worker.onrender.com`
+- `MAIN_API_URL=https://omni-backend-4t7s.onrender.com/api`
+
 ### 2) Landing frontend `.env`
 
 Create/edit: `landing-page/frontend/.env`
@@ -230,6 +238,10 @@ VITE_PAGE_CACHE_TTL_MS=30000
 Frontend cache reference:
 
 - `VITE_PAGE_CACHE_TTL_MS`: optional GET-response cache TTL (milliseconds) for faster page reloads in customer/broker/worker apps.
+
+Render production API value for frontend services:
+
+- `VITE_API_URL=https://omni-backend-4t7s.onrender.com/api`
 
 ## Run the Project Locally
 

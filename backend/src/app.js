@@ -4,6 +4,41 @@ import routes from "./routes/index.js";
 import logger from "./utils/logger.js";
 
 const app = express();
+const isProductionEnv = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+
+const DEFAULT_URLS = {
+  landing: isProductionEnv ? "https://omni-landing-page.onrender.com" : "http://localhost:5173",
+  customer: isProductionEnv ? "https://omni-customer.onrender.com" : "http://localhost:5174",
+  broker: isProductionEnv ? "https://omni-broker.onrender.com" : "http://localhost:5175",
+  worker: isProductionEnv ? "https://omni-worker.onrender.com" : "http://localhost:5176",
+  api: isProductionEnv ? "https://omni-backend-4t7s.onrender.com/api" : "http://localhost:5000/api"
+};
+
+function normalizeBaseUrl(value, fallback) {
+  const normalized = String(value || fallback || "").trim().replace(/\/+$/, "");
+  return normalized || String(fallback || "").trim();
+}
+
+function getPublicConfig() {
+  const apiBase = normalizeBaseUrl(process.env.MAIN_API_URL, DEFAULT_URLS.api);
+  const backendBase = apiBase.replace(/\/api$/, "");
+
+  return {
+    environment: process.env.NODE_ENV || "development",
+    apps: {
+      landing: normalizeBaseUrl(process.env.LANDING_APP_URL, DEFAULT_URLS.landing),
+      customer: normalizeBaseUrl(process.env.CUSTOMER_APP_URL, DEFAULT_URLS.customer),
+      broker: normalizeBaseUrl(process.env.BROKER_APP_URL, DEFAULT_URLS.broker),
+      worker: normalizeBaseUrl(process.env.WORKER_APP_URL, DEFAULT_URLS.worker)
+    },
+    api: {
+      backendBase,
+      main: apiBase,
+      health: `${apiBase}/health`,
+      config: `${apiBase}/config`
+    }
+  };
+}
 
 function isDatabaseConnectivityError(error) {
   const name = String(error?.name || "").toLowerCase();
@@ -76,7 +111,43 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (_req, res) => {
-  res.json({ message: "Omni API is running" });
+  res.set("Cache-Control", "no-store");
+  const info = getPublicConfig();
+  res.json({
+    message: "Omni Backend is running",
+    ok: true,
+    timestamp: new Date().toISOString(),
+    environment: info.environment,
+    urls: {
+      backend: info.api.backendBase,
+      api: info.api.main,
+      health: info.api.health,
+      config: info.api.config
+    },
+    apps: info.apps,
+    note: "Use /api/health and /api/config for programmatic checks."
+  });
+});
+
+app.get("/api", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  const info = getPublicConfig();
+  res.json({
+    message: "Omni API root",
+    ok: true,
+    timestamp: new Date().toISOString(),
+    api: info.api,
+    apps: info.apps,
+    endpoints: {
+      health: "/api/health",
+      config: "/api/config",
+      authLogin: "/api/auth/login",
+      profile: "/api/profile",
+      customerDashboard: "/api/customer/dashboard",
+      brokerDashboard: "/api/broker/dashboard",
+      workerDashboard: "/api/worker/dashboard"
+    }
+  });
 });
 
 app.use("/api", routes);

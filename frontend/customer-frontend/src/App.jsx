@@ -3,8 +3,10 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import api from "./api";
 
 const role = "customer";
-const brokerUrl = import.meta.env.VITE_BROKER_APP_URL || "http://localhost:5175";
-const workerUrl = import.meta.env.VITE_WORKER_APP_URL || "http://localhost:5176";
+const defaultBrokerUrl = import.meta.env.PROD ? "https://omni-broker.onrender.com" : "http://localhost:5175";
+const defaultWorkerUrl = import.meta.env.PROD ? "https://omni-worker.onrender.com" : "http://localhost:5176";
+const brokerUrl = import.meta.env.VITE_BROKER_APP_URL || defaultBrokerUrl;
+const workerUrl = import.meta.env.VITE_WORKER_APP_URL || defaultWorkerUrl;
 const sessionKey = "omni_customer_session";
 const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
 const CustomerAuthPage = lazy(() => import("./components/CustomerAuthPage"));

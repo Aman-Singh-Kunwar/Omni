@@ -109,6 +109,14 @@ function normalizeBaseUrl(value, fallback) {
   return normalized || String(fallback || "").trim();
 }
 
+const isProductionEnv = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+const DEFAULT_ROLE_BASE_URLS = {
+  landing: isProductionEnv ? "https://omni-landing-page.onrender.com" : "http://localhost:5173",
+  customer: isProductionEnv ? "https://omni-customer.onrender.com" : "http://localhost:5174",
+  broker: isProductionEnv ? "https://omni-broker.onrender.com" : "http://localhost:5175",
+  worker: isProductionEnv ? "https://omni-worker.onrender.com" : "http://localhost:5176"
+};
+
 function getRoleLabel(role) {
   if (role === "customer") {
     return "Customer";
@@ -124,15 +132,15 @@ function getRoleLabel(role) {
 
 function getRoleAppBaseUrl(role) {
   if (role === "customer") {
-    return normalizeBaseUrl(process.env.CUSTOMER_APP_URL, "http://localhost:5174");
+    return normalizeBaseUrl(process.env.CUSTOMER_APP_URL, DEFAULT_ROLE_BASE_URLS.customer);
   }
   if (role === "broker") {
-    return normalizeBaseUrl(process.env.BROKER_APP_URL, "http://localhost:5175");
+    return normalizeBaseUrl(process.env.BROKER_APP_URL, DEFAULT_ROLE_BASE_URLS.broker);
   }
   if (role === "worker") {
-    return normalizeBaseUrl(process.env.WORKER_APP_URL, "http://localhost:5176");
+    return normalizeBaseUrl(process.env.WORKER_APP_URL, DEFAULT_ROLE_BASE_URLS.worker);
   }
-  return normalizeBaseUrl(process.env.LANDING_APP_URL, "http://localhost:5173");
+  return normalizeBaseUrl(process.env.LANDING_APP_URL, DEFAULT_ROLE_BASE_URLS.landing);
 }
 
 function getRoleLoginUrl(role) {
@@ -144,7 +152,7 @@ function getRoleSignupUrl(role) {
 }
 
 function getLandingUrl() {
-  return normalizeBaseUrl(process.env.LANDING_APP_URL, "http://localhost:5173");
+  return normalizeBaseUrl(process.env.LANDING_APP_URL, DEFAULT_ROLE_BASE_URLS.landing);
 }
 
 function escapeHtml(value) {
