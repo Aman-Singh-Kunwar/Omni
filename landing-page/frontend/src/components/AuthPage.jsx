@@ -8,7 +8,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const navigate = useNavigate();
   const location = useLocation();
   const roleFromUrl = useMemo(() => {
-    const role = new URLSearchParams(location.search).get("role");
+    const role = new URLSearchParams(location.search).get("role") || new URLSearchParams(window.location.search).get("role");
     return roleList.includes(role) ? role : "customer";
   }, [location.search]);
   const [selectedRole, setSelectedRole] = useState(roleFromUrl);

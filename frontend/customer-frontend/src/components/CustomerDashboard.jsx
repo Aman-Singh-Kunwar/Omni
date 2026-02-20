@@ -666,7 +666,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     navigateToBooking({ source: 'service', serviceName: service.name });
   };
 
-  const closeBookingModal = () => {
+  const closeBookingModal = ({ navigateHome = true } = {}) => {
     setBookingStatus({ loading: false, error: '' });
     setBookingForm({
       workerId: '',
@@ -677,7 +677,9 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       location: 'Dehradun',
       description: ''
     });
-    navigateToTab('home');
+    if (navigateHome) {
+      navigateToTab('home');
+    }
   };
 
   const handleProviderBook = (provider) => {
@@ -811,7 +813,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     setBookingStatus({ loading: true, error: '' });
     try {
       const bookedServiceMeta = getServiceMetaByName(selectedServiceName);
-      await api.post(
+      const bookingResponse = await api.post(
         '/bookings',
         {
           service: selectedServiceName,
@@ -828,8 +830,33 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         }
       );
 
+      const createdBooking = bookingResponse?.data?.booking || null;
+      if (createdBooking && (createdBooking._id || createdBooking.id)) {
+        const createdBookingId = toStableId(
+          createdBooking._id || createdBooking.id,
+          `${selectedServiceName}-${bookingForm.date}-${bookingForm.time}-${Date.now()}`
+        );
+        const createdBookingRecord = {
+          status: createdBooking.status || 'pending',
+          showWorkerDetails: false,
+          id: createdBookingId,
+          service: createdBooking.service || selectedServiceName || 'Service',
+          provider: 'Worker will be assigned after acceptance',
+          workerEmail: '',
+          workerPhone: '',
+          date: createdBooking.date || bookingForm.date || '',
+          time: createdBooking.time || bookingForm.time || '',
+          rating: null,
+          feedback: '',
+          amount: Number(createdBooking.amount || 0),
+          createdAt: createdBooking.createdAt || new Date().toISOString()
+        };
+
+        setRecentBookings((prev) => [createdBookingRecord, ...prev.filter((booking) => booking.id !== createdBookingId)]);
+      }
+
       setBookingStatus({ loading: false, error: '' });
-      closeBookingModal();
+      closeBookingModal({ navigateHome: false });
       navigateToTab('bookings');
       await loadDashboard();
     } catch (error) {

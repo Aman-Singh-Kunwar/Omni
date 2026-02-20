@@ -31,7 +31,7 @@ function LandingPage() {
   );
 
   useEffect(() => {
-    const role = new URLSearchParams(location.search).get("role");
+    const role = new URLSearchParams(location.search).get("role") || new URLSearchParams(window.location.search).get("role");
     if (role && roleList.includes(role)) {
       navigate(`/login?role=${role}`, { replace: true });
     }

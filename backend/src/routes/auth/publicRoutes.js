@@ -144,11 +144,11 @@ function getRoleAppBaseUrl(role) {
 }
 
 function getRoleLoginUrl(role) {
-  return `${getRoleAppBaseUrl(role)}/login`;
+  return `${getRoleAppBaseUrl(role)}/#/login`;
 }
 
 function getRoleSignupUrl(role) {
-  return `${getRoleAppBaseUrl(role)}/signup`;
+  return `${getRoleAppBaseUrl(role)}/#/signup`;
 }
 
 function getLandingUrl() {
