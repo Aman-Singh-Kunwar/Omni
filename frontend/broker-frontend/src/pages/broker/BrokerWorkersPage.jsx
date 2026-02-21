@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
 
-function BrokerWorkersPage({ authToken }) {
+function BrokerWorkersPage({ authToken, refreshSignal = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [brokerCode, setBrokerCode] = useState("");
@@ -19,7 +19,8 @@ function BrokerWorkersPage({ authToken }) {
       setError("");
       try {
         const response = await api.get("/broker/workers", {
-          headers: { Authorization: `Bearer ${authToken}` }
+          headers: { Authorization: `Bearer ${authToken}` },
+          cache: false
         });
         setBrokerCode(response.data?.brokerCode || "");
         setWorkers(Array.isArray(response.data?.workers) ? response.data.workers : []);
@@ -32,7 +33,7 @@ function BrokerWorkersPage({ authToken }) {
     };
 
     loadWorkers();
-  }, [authToken]);
+  }, [authToken, refreshSignal]);
 
   if (!authToken) {
     return (

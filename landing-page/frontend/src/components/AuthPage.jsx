@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, X } from "lucide-react";
 import omniLogo from "../assets/images/omni-logo.png";
 import { roleList, roleMeta } from "../constants/roles";
 
@@ -39,10 +39,27 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [forgotPasswordStatus, setForgotPasswordStatus] = useState({ loading: false, error: "", info: "" });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+  const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
 
   useEffect(() => {
     setSelectedRole(roleFromUrl);
   }, [roleFromUrl]);
+
+  useEffect(() => {
+    if (!mobileRolePanelOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileRolePanelOpen]);
+
+  useEffect(() => {
+    setMobileRolePanelOpen(false);
+  }, [location.pathname, location.search]);
 
   const getRoleUrl = (role) => {
     if (role === "customer") {
@@ -298,6 +315,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     id: role,
     ...roleMeta[role]
   }));
+  const selectedRoleTitle = roleMeta[selectedRole]?.title || "Customer";
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
@@ -457,7 +475,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
             )}
           </section>
 
-          <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8 lg:col-span-3">
+          <section className="hidden rounded-2xl border bg-white p-6 shadow-sm sm:p-8 lg:col-span-3 lg:block">
             <h3 className="text-lg font-bold text-slate-900">Choose Role</h3>
             <p className="mt-1 text-sm text-slate-500">This sets your account type and destination frontend.</p>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -488,6 +506,103 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
             </div>
           </section>
         </div>
+      </div>
+
+      <div
+        className={`fixed inset-y-0 right-0 z-30 transition-all duration-300 lg:hidden ${
+          mobileRolePanelOpen ? "translate-x-full opacity-0 pointer-events-none" : "translate-x-0 opacity-100"
+        }`}
+      >
+        <div className="relative h-full w-[102px]">
+          <div className="pointer-events-none absolute inset-y-3 right-0 w-4 rounded-l-2xl border border-r-0 border-slate-300 bg-gradient-to-b from-white via-slate-100 to-white shadow-[0_0_18px_rgba(15,23,42,0.12)]" />
+          <div className="pointer-events-none absolute right-3 top-28 inline-flex h-9 w-[74px] items-center justify-center rounded-l-lg border border-r-0 border-slate-300 bg-white/95 px-2 text-xs font-semibold text-blue-700 shadow-sm truncate">
+            {selectedRoleTitle}
+          </div>
+          <div className="pointer-events-none absolute right-[4px] bottom-8 h-8 w-[8px] rounded-l-full bg-slate-200/80" />
+          <button
+            type="button"
+            disabled={verification.pending}
+            onClick={() => setMobileRolePanelOpen(true)}
+            className="pointer-events-auto absolute right-0 top-1/2 inline-flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-slate-300 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+            aria-label="Open role selector"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className={`fixed inset-0 z-40 lg:hidden ${mobileRolePanelOpen ? "" : "pointer-events-none"}`}>
+        <button
+          type="button"
+          onClick={() => setMobileRolePanelOpen(false)}
+          aria-label="Close role selection"
+          className={`absolute inset-0 bg-slate-900/35 transition-opacity duration-300 ${mobileRolePanelOpen ? "opacity-100" : "opacity-0"}`}
+        />
+        <aside
+          className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl transition-transform duration-300 ease-out ${
+            mobileRolePanelOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between rounded-tl-3xl border-b border-slate-200 bg-white/90 px-4 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Choose Role</h3>
+                <p className="text-xs text-slate-500">Select your account type</p>
+                <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                  <span className="text-[10px] uppercase tracking-wide text-blue-500">Selected role</span>
+                  <span className="truncate rounded border border-blue-200 bg-white px-1.5 py-0.5 text-blue-700">
+                    {selectedRoleTitle}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileRolePanelOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                aria-label="Close role panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-3">
+                {roleCards.map((role) => {
+                  const Icon = role.icon;
+                  const selected = selectedRole === role.id;
+                  return (
+                    <button
+                      key={role.id}
+                      type="button"
+                      disabled={verification.pending}
+                      onClick={() => {
+                        setSelectedRole(role.id);
+                        updateRoleQuery(role.id);
+                        setMobileRolePanelOpen(false);
+                      }}
+                      className={`w-full rounded-xl border p-4 text-left transition-all ${
+                        selected ? "border-blue-500 bg-blue-50 shadow-sm ring-1 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-300"
+                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                    >
+                      <div className="mb-3 flex items-start justify-between">
+                        <div className={`flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-r ${role.color}`}>
+                          <Icon className="h-5 w-5 text-white" />
+                        </div>
+                        {selected && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                            <Check className="h-3 w-3" />
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-semibold text-slate-900">{role.title}</h4>
+                      <p className="mt-1 text-xs text-slate-600">{role.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {forgotPasswordOpen && (

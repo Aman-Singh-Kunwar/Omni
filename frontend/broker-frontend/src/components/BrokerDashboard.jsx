@@ -4,6 +4,7 @@ import omniLogo from "../assets/images/omni-logo.png";
 import api from "../api";
 import { Bell, Settings, MoreVertical, X, User, ChevronDown, LogOut, Briefcase, Wrench } from "lucide-react";
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
+import { createRealtimeSocket } from "@shared/utils/realtime";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
 const BrokerOverviewPage = lazy(() => import("../pages/broker/BrokerOverviewPage"));
@@ -32,6 +33,7 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
   });
   const [recentBookings, setRecentBookings] = useState([]);
   const [topWorkers, setTopWorkers] = useState([]);
+  const [refreshSignal, setRefreshSignal] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState([]);
   const [clearedNotificationIds, setClearedNotificationIds] = useState([]);
@@ -65,7 +67,6 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
   };
   const pathTabMap = Object.fromEntries(Object.entries(tabPathMap).map(([tab, path]) => [path, tab]));
   const activeTab = pathTabMap[location.pathname] || "overview";
-  const needsDashboardData = !["profile", "settings"].includes(activeTab);
   const needsProfileData = activeTab === "profile";
 
   const navTabs = ["overview", "workers", "bookings", "earnings"];
@@ -202,43 +203,92 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
     }
   }, [notificationStorageKey, notificationsHydrated, readNotificationIds, clearedNotificationIds]);
 
+  const loadDashboard = useCallback(async ({ forceFresh = true } = {}) => {
+    try {
+      const response = await api.get("/broker/dashboard", {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        ...(forceFresh ? { cache: false } : {})
+      });
+
+      setStats(response.data?.stats || { totalWorkers: 0, totalEarnings: 0, activeBookings: 0, monthlyGrowth: 0 });
+      setRecentBookings(
+        Array.isArray(response.data?.recentBookings)
+          ? response.data.recentBookings.map((booking) => ({
+              id: toStableId(booking.id || booking._id, `${booking.customer}-${booking.service}-${booking.status}`),
+              customer: booking.customer || "Customer",
+              service: booking.service || "Service",
+              worker: booking.worker || "Worker",
+              commission: Number(booking.commission || 0),
+              status: booking.status || "pending"
+            }))
+          : []
+      );
+      setTopWorkers(Array.isArray(response.data?.topWorkers) ? response.data.topWorkers : []);
+      if (response.data?.brokerCode) {
+        setProfileForm((prev) => ({ ...prev, brokerCode: response.data.brokerCode }));
+      }
+    } catch (_error) {
+      setStats({ totalWorkers: 0, totalEarnings: 0, activeBookings: 0, monthlyGrowth: 0 });
+      setRecentBookings([]);
+      setTopWorkers([]);
+    }
+  }, [authToken]);
+
   useEffect(() => {
-    if (!needsDashboardData) {
+    if (!authToken) {
       return;
     }
 
-    const loadDashboard = async () => {
-      try {
-        const response = await api.get("/broker/dashboard", {
-          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
-        });
+    loadDashboard();
+  }, [authToken, loadDashboard]);
 
-        setStats(response.data?.stats || { totalWorkers: 0, totalEarnings: 0, activeBookings: 0, monthlyGrowth: 0 });
-        setRecentBookings(
-          Array.isArray(response.data?.recentBookings)
-            ? response.data.recentBookings.map((booking) => ({
-                id: toStableId(booking.id || booking._id, `${booking.customer}-${booking.service}-${booking.status}`),
-                customer: booking.customer || "Customer",
-                service: booking.service || "Service",
-                worker: booking.worker || "Worker",
-                commission: Number(booking.commission || 0),
-                status: booking.status || "pending"
-              }))
-            : []
-        );
-        setTopWorkers(Array.isArray(response.data?.topWorkers) ? response.data.topWorkers : []);
-        if (response.data?.brokerCode) {
-          setProfileForm((prev) => ({ ...prev, brokerCode: response.data.brokerCode }));
-        }
-      } catch (_error) {
-        setStats({ totalWorkers: 0, totalEarnings: 0, activeBookings: 0, monthlyGrowth: 0 });
-        setRecentBookings([]);
-        setTopWorkers([]);
+  useEffect(() => {
+    if (!authToken) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadDashboard();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [authToken, loadDashboard]);
+
+  useEffect(() => {
+    if (!authToken) {
+      return undefined;
+    }
+
+    const socket = createRealtimeSocket(authToken);
+    if (!socket) {
+      return undefined;
+    }
+
+    let refreshTimerId = null;
+    const triggerRealtimeRefresh = () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
       }
+
+      refreshTimerId = window.setTimeout(() => {
+        api.clearApiCache?.();
+        setRefreshSignal((prev) => prev + 1);
+        loadDashboard({ forceFresh: true });
+      }, 250);
     };
 
-    loadDashboard();
-  }, [authToken, needsDashboardData]);
+    socket.on("connect", triggerRealtimeRefresh);
+    socket.on("booking:changed", triggerRealtimeRefresh);
+
+    return () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+      socket.off("connect", triggerRealtimeRefresh);
+      socket.off("booking:changed", triggerRealtimeRefresh);
+      socket.disconnect();
+    };
+  }, [authToken, loadDashboard]);
 
   useEffect(() => {
     const fallback = {
@@ -421,15 +471,15 @@ const BrokerDashboard = ({ onLogout, customerUrl, workerUrl, userName = "Sarah B
     }
 
     if (activeTab === "workers") {
-      return <BrokerWorkersPage authToken={authToken} />;
+      return <BrokerWorkersPage authToken={authToken} refreshSignal={refreshSignal} />;
     }
 
     if (activeTab === "bookings") {
-      return <BrokerBookingsPage authToken={authToken} />;
+      return <BrokerBookingsPage authToken={authToken} refreshSignal={refreshSignal} />;
     }
 
     if (activeTab === "earnings") {
-      return <BrokerEarningsPage authToken={authToken} stats={stats} />;
+      return <BrokerEarningsPage authToken={authToken} stats={stats} refreshSignal={refreshSignal} />;
     }
 
     if (activeTab === "profile") {

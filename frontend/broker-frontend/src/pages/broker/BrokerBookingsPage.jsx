@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
 
-function BrokerBookingsPage({ authToken }) {
+function BrokerBookingsPage({ authToken, refreshSignal = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [brokerCode, setBrokerCode] = useState("");
@@ -19,7 +19,8 @@ function BrokerBookingsPage({ authToken }) {
       setError("");
       try {
         const response = await api.get("/broker/bookings", {
-          headers: { Authorization: `Bearer ${authToken}` }
+          headers: { Authorization: `Bearer ${authToken}` },
+          cache: false
         });
         setBrokerCode(response.data?.brokerCode || "");
         setBookings(Array.isArray(response.data?.bookings) ? response.data.bookings : []);
@@ -32,7 +33,7 @@ function BrokerBookingsPage({ authToken }) {
     };
 
     loadBookings();
-  }, [authToken]);
+  }, [authToken, refreshSignal]);
 
   if (!authToken) {
     return (

@@ -24,6 +24,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
+import { createRealtimeSocket } from "@shared/utils/realtime";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
 const CustomerHomePage = lazy(() => import('../pages/customer/CustomerHomePage'));
@@ -173,6 +174,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   const activeTab = pathTabMap[location.pathname] || 'home';
   const needsDashboardData = ['home', 'bookService', 'bookings', 'favorites'].includes(activeTab);
   const needsWorkersData = ['home', 'bookService', 'favorites'].includes(activeTab);
+  const needsDashboardDataRef = useRef(needsDashboardData);
+  const needsWorkersDataRef = useRef(needsWorkersData);
   const needsProfileData = activeTab === 'profile';
   const bookingQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -423,6 +426,24 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     setBookingStatus({ loading: false, error: '' });
   }, [activeTab, bookingSource, bookingQuery.workerId]);
 
+  const loadWorkers = useCallback(async ({ forceFresh = true } = {}) => {
+    if (!authToken) {
+      setAvailableWorkers([]);
+      setWorkersLoading(false);
+      return;
+    }
+
+    setWorkersLoading(true);
+    try {
+      const response = await api.get('/workers/available', forceFresh ? { cache: false } : {});
+      setAvailableWorkers(Array.isArray(response.data?.workers) ? response.data.workers : []);
+    } catch (_error) {
+      setAvailableWorkers([]);
+    } finally {
+      setWorkersLoading(false);
+    }
+  }, [authToken]);
+
   useEffect(() => {
     if (!authToken || !needsWorkersData) {
       setAvailableWorkers([]);
@@ -430,19 +451,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       return;
     }
 
-    const loadWorkers = async () => {
-      setWorkersLoading(true);
-      try {
-        const response = await api.get('/workers/available');
-        setAvailableWorkers(Array.isArray(response.data?.workers) ? response.data.workers : []);
-      } catch (_error) {
-        setAvailableWorkers([]);
-      } finally {
-        setWorkersLoading(false);
-      }
-    };
     loadWorkers();
-  }, [authToken, needsWorkersData]);
+  }, [authToken, loadWorkers, needsWorkersData]);
 
   useEffect(() => {
     try {
@@ -558,11 +568,12 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     }
   }, [notificationStorageKey, notificationsHydrated, readNotificationIds, clearedNotificationIds]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async ({ forceFresh = true } = {}) => {
     try {
       const response = await api.get('/customer/dashboard', {
         params: { customer: userName },
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        ...(forceFresh ? { cache: false } : {})
       });
 
       setStats(response.data?.stats || { totalBookings: 0, completed: 0, upcoming: 0, moneySaved: 0 });
@@ -595,14 +606,59 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       setStats({ totalBookings: 0, completed: 0, upcoming: 0, moneySaved: 0 });
       setRecentBookings([]);
     }
-  };
+  }, [authToken, userName]);
+
+  useEffect(() => {
+    needsDashboardDataRef.current = needsDashboardData;
+    needsWorkersDataRef.current = needsWorkersData;
+  }, [needsDashboardData, needsWorkersData]);
 
   useEffect(() => {
     if (!needsDashboardData) {
       return;
     }
     loadDashboard();
-  }, [authToken, userName, needsDashboardData]);
+  }, [loadDashboard, needsDashboardData]);
+
+  useEffect(() => {
+    if (!authToken) {
+      return undefined;
+    }
+
+    const socket = createRealtimeSocket(authToken);
+    if (!socket) {
+      return undefined;
+    }
+
+    let refreshTimerId = null;
+    const triggerFreshReload = () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+
+      refreshTimerId = window.setTimeout(() => {
+        api.clearApiCache?.();
+        if (needsDashboardDataRef.current) {
+          loadDashboard({ forceFresh: true });
+        }
+        if (needsWorkersDataRef.current) {
+          loadWorkers({ forceFresh: true });
+        }
+      }, 250);
+    };
+
+    socket.on('connect', triggerFreshReload);
+    socket.on('booking:changed', triggerFreshReload);
+
+    return () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+      socket.off('connect', triggerFreshReload);
+      socket.off('booking:changed', triggerFreshReload);
+      socket.disconnect();
+    };
+  }, [authToken, loadDashboard, loadWorkers]);
 
   useEffect(() => {
     const fallback = {

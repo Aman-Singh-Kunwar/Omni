@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
+import http from "node:http";
 import app from "./app.js";
 import connectMongo from "./config/db.js";
+import { initSocketServer } from "./socket.js";
 import logger from "./utils/logger.js";
 dotenv.config();
 
@@ -28,7 +30,9 @@ logger.infoOnce("backend_starting", "Starting backend", {
 
 connectMongo()
   .then(() => {
-    app.listen(PORT, () => {
+    const server = http.createServer(app);
+    initSocketServer(server);
+    server.listen(PORT, () => {
       logger.infoOnce("backend_listening", "Backend listening", { port: PORT });
     });
   })

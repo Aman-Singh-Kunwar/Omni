@@ -18,7 +18,7 @@ function StatCard({ icon: Icon, title, value }) {
   );
 }
 
-function BrokerEarningsPage({ authToken, stats }) {
+function BrokerEarningsPage({ authToken, stats, refreshSignal = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [completedBookings, setCompletedBookings] = useState([]);
@@ -34,7 +34,8 @@ function BrokerEarningsPage({ authToken, stats }) {
       setError("");
       try {
         const response = await api.get("/broker/bookings", {
-          headers: { Authorization: `Bearer ${authToken}` }
+          headers: { Authorization: `Bearer ${authToken}` },
+          cache: false
         });
         setCompletedBookings(Array.isArray(response.data?.bookings) ? response.data.bookings : []);
       } catch (requestError) {
@@ -46,7 +47,7 @@ function BrokerEarningsPage({ authToken, stats }) {
     };
 
     loadCompletedBookings();
-  }, [authToken]);
+  }, [authToken, refreshSignal]);
 
   return (
     <div className="space-y-8">

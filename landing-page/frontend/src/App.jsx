@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 const defaultApiBase = import.meta.env.PROD ? "https://omni-backend-4t7s.onrender.com/api" : "http://localhost:5000/api";
 const apiBase = import.meta.env.VITE_API_URL || defaultApiBase;
@@ -14,6 +14,16 @@ const defaultConfig = {
     worker: import.meta.env.PROD ? "https://omni-worker.onrender.com" : "http://localhost:5176"
   }
 };
+
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
+
+  return null;
+}
 
 function App() {
   const [config, setConfig] = useState(defaultConfig);
@@ -44,6 +54,7 @@ function App() {
 
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">Loading page...</div>}>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage mode="login" {...routeProps} />} />

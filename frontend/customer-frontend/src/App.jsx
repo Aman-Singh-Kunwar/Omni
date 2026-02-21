@@ -131,7 +131,7 @@ function App() {
     } finally {
       clearSession();
       setAuthSession(null);
-      navigate("/login");
+      navigate("/", { replace: true });
     }
   };
 
@@ -168,16 +168,20 @@ function App() {
             key={path}
             path={path}
             element={
-              <div onClickCapture={handleGuestInteraction}>
-                <CustomerDashboard
-                  brokerUrl={brokerUrl}
-                  workerUrl={workerUrl}
-                  userName={authUser?.name || "Guest Customer"}
-                  userEmail={authUser?.email || ""}
-                  authToken={authToken}
-                  onLogout={handleLogout}
-                />
-              </div>
+              authUser || path === "/" ? (
+                <div onClickCapture={handleGuestInteraction}>
+                  <CustomerDashboard
+                    brokerUrl={brokerUrl}
+                    workerUrl={workerUrl}
+                    userName={authUser?.name || "Guest Customer"}
+                    userEmail={authUser?.email || ""}
+                    authToken={authToken}
+                    onLogout={handleLogout}
+                  />
+                </div>
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
         ))}

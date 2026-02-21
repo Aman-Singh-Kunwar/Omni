@@ -4,6 +4,7 @@ import omniLogo from "../assets/images/omni-logo.png";
 import api from "../api";
 import { Bell, Settings, MoreVertical, X, User, ChevronDown, Briefcase, LogOut } from "lucide-react";
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
+import { createRealtimeSocket } from "@shared/utils/realtime";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
 
 const WorkerOverviewPage = lazy(() => import("../pages/worker/WorkerOverviewPage"));
@@ -202,11 +203,12 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     }
   }, [notificationStorageKey, notificationsHydrated, readNotificationIds, clearedNotificationIds]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async ({ forceFresh = true } = {}) => {
     try {
       const requestConfig = {
         params: { worker: userName },
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        ...(forceFresh ? { cache: false } : {})
       };
       const [dashboardResponse, reviewsResponse] = await Promise.all([
         api.get("/worker/dashboard", requestConfig),
@@ -279,14 +281,14 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
       setRecentJobs([]);
       setReviews([]);
     }
-  };
+  }, [authToken, userName]);
 
   useEffect(() => {
     if (!needsDashboardData) {
       return;
     }
     loadDashboard();
-  }, [authToken, userName, needsDashboardData]);
+  }, [loadDashboard, needsDashboardData]);
 
   useEffect(() => {
     if (!authToken || !needsDashboardData) {
@@ -298,7 +300,42 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     }, 15000);
 
     return () => window.clearInterval(intervalId);
-  }, [authToken, userName, needsDashboardData]);
+  }, [authToken, loadDashboard, needsDashboardData]);
+
+  useEffect(() => {
+    if (!authToken) {
+      return undefined;
+    }
+
+    const socket = createRealtimeSocket(authToken);
+    if (!socket) {
+      return undefined;
+    }
+
+    let refreshTimerId = null;
+    const triggerFreshReload = () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+
+      refreshTimerId = window.setTimeout(() => {
+        api.clearApiCache?.();
+        loadDashboard({ forceFresh: true });
+      }, 250);
+    };
+
+    socket.on("connect", triggerFreshReload);
+    socket.on("booking:changed", triggerFreshReload);
+
+    return () => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+      socket.off("connect", triggerFreshReload);
+      socket.off("booking:changed", triggerFreshReload);
+      socket.disconnect();
+    };
+  }, [authToken, loadDashboard]);
 
   useEffect(() => {
     const fallback = {

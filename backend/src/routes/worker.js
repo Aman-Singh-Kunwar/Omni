@@ -1,6 +1,7 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
+import { emitBookingRealtimeEvent } from "../realtime/bookingEvents.js";
 import { BROKER_COMMISSION_RATE_PERCENT, bookingAssignedToWorker, bookingHasAssignedWorker, calculateBrokerCommissionAmount, calculateWorkerNetEarning, expireTimedOutPendingBookings, getLinkedBrokerForWorker, isLikelyObjectId, pendingBookingVisibleToWorker, readAuthUserFromRequest, requireAuth, workerProvidesService } from "./helpers.js";
 const router = express.Router();
 
@@ -204,6 +205,13 @@ router.patch("/worker/bookings/:bookingId", requireAuth, async (req, res, next) 
     }
 
     await booking.save();
+    if (action === "accept") {
+      emitBookingRealtimeEvent(booking, { action: "accepted", audience: "all" });
+    } else if (isAssignedToCurrentWorker && bookingHasAssignedWorker(booking)) {
+      emitBookingRealtimeEvent(booking, { action: "cancelled-by-worker", audience: "all" });
+    } else {
+      emitBookingRealtimeEvent(booking, { action: "rejected", audience: "worker" });
+    }
 
     return res.json({ booking });
   } catch (error) {

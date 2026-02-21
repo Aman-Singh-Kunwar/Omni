@@ -2,6 +2,7 @@ import express from "express";
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
 import User from "../models/User.js";
+import { emitBookingRealtimeEvent } from "../realtime/bookingEvents.js";
 import { BROKER_COMMISSION_RATE_PERCENT, CUSTOMER_CANCELLABLE_STATUSES, CUSTOMER_CANCEL_WINDOW_MS, CUSTOMER_NOT_PROVIDED_ELIGIBLE_STATUSES, CUSTOMER_PAYMENT_ELIGIBLE_STATUSES, CUSTOMER_REVIEW_ELIGIBLE_STATUSES, bookingAssignedToWorker, bookingHasAssignedWorker, calculateBrokerCommissionAmount, ensureBookingBrokerAttribution, expireTimedOutPendingBookings, findAssignedWorkerForBooking, getAvailableWorkers, getWorkerBrokerCommissionProgress, isLikelyObjectId, readAuthUserFromRequest, requireAuth, safeNormalizeBrokerCode, workerProvidesService } from "./helpers.js";
 const router = express.Router();
 
@@ -186,6 +187,7 @@ router.post("/bookings", requireAuth, async (req, res, next) => {
       rating: payload.rating
     });
 
+    emitBookingRealtimeEvent(booking, { action: "created", audience: "all" });
     return res.status(201).json({ booking });
   } catch (error) {
     return next(error);
@@ -225,6 +227,7 @@ router.patch("/customer/bookings/:bookingId/cancel", requireAuth, async (req, re
     booking.status = "cancelled";
     await booking.save();
 
+    emitBookingRealtimeEvent(booking, { action: "cancelled", audience: "all" });
     return res.json({ booking });
   } catch (error) {
     return next(error);
@@ -257,6 +260,7 @@ router.delete("/customer/bookings/:bookingId", requireAuth, async (req, res, nex
     booking.hiddenForCustomer = true;
     booking.hiddenForCustomerAt = new Date();
     await booking.save();
+    emitBookingRealtimeEvent(booking, { action: "hidden", audience: "customer" });
     return res.json({ ok: true, booking });
   } catch (error) {
     return next(error);
@@ -294,6 +298,7 @@ router.patch("/customer/bookings/:bookingId/not-provided", requireAuth, async (r
     booking.status = "not-provided";
     await booking.save();
 
+    emitBookingRealtimeEvent(booking, { action: "not-provided", audience: "all" });
     return res.json({ booking });
   } catch (error) {
     return next(error);
@@ -358,6 +363,7 @@ router.patch("/customer/bookings/:bookingId/pay", requireAuth, async (req, res, 
         : 0;
     await booking.save();
 
+    emitBookingRealtimeEvent(booking, { action: "completed", audience: "all" });
     return res.json({ booking });
   } catch (error) {
     return next(error);
@@ -407,6 +413,7 @@ router.patch("/customer/bookings/:bookingId/review", requireAuth, async (req, re
     booking.feedback = feedback;
     await booking.save();
 
+    emitBookingRealtimeEvent(booking, { action: "reviewed", audience: "all" });
     return res.json({ booking });
   } catch (error) {
     return next(error);
