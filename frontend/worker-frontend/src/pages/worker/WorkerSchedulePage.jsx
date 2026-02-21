@@ -1,11 +1,31 @@
 import React from "react";
-import { Calendar, MapPin, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar, MapPin, Clock } from "lucide-react";
 
 function WorkerSchedulePage({ scheduleJobs }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   return (
     <div className="bg-white/80 shadow-sm rounded-xl border">
       <div className="px-4 py-5 sm:p-6">
-        <h3 className="text-lg leading-6 font-bold text-gray-900 mb-6">Scheduled Jobs</h3>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h3 className="text-lg leading-6 font-bold text-gray-900">Scheduled Jobs</h3>
+          <button
+            type="button"
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        </div>
         <div className="space-y-4">
           {scheduleJobs.map((job) => (
             <div key={job.id} className="border border-gray-200 rounded-lg p-4 bg-white/60">

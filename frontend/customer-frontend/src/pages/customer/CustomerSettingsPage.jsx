@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import api from "../../api";
 import { toBooleanOrDefault, toShortErrorMessage } from "@shared/utils/common";
 import NotificationSettingsSection from "@shared/settings/NotificationSettingsSection";
@@ -33,6 +34,13 @@ function normalizeSettings(value) {
 
 function CustomerSettingsPage({ onLogout, authToken, userName = "" }) {
   const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
   const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
   const [showNotificationsForm, setShowNotificationsForm] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState({ loading: false, error: "", success: "" });
@@ -185,8 +193,13 @@ function CustomerSettingsPage({ onLogout, authToken, userName = "" }) {
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h3 className="text-xl font-bold text-gray-900">Settings</h3>
-          <button type="button" onClick={() => navigate("/")} className="text-sm font-medium text-gray-600 hover:text-gray-900">
-            {"← back to dashboard"}
+          <button
+            type="button"
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </button>
         </div>
         <div className="space-y-6">
@@ -235,3 +248,4 @@ function CustomerSettingsPage({ onLogout, authToken, userName = "" }) {
 }
 
 export default CustomerSettingsPage;
+

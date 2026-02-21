@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight, X } from "lucide-react";
 import omniLogo from "../assets/images/omni-logo.png";
@@ -40,6 +40,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
+  const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, edgeStart: false });
 
   useEffect(() => {
     setSelectedRole(roleFromUrl);
@@ -317,8 +318,45 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   }));
   const selectedRoleTitle = roleMeta[selectedRole]?.title || "Customer";
 
+  const handleMobileSwipeStart = (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) {
+      return;
+    }
+
+    const viewportWidth = window.innerWidth || 0;
+    mobileRoleSwipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      edgeStart: touch.clientX >= viewportWidth - 120
+    };
+  };
+
+  const handleMobileSwipeEnd = (event) => {
+    if (mobileRolePanelOpen || verification.pending) {
+      return;
+    }
+
+    const start = mobileRoleSwipeRef.current;
+    const touch = event.changedTouches?.[0];
+    if (!touch || !start.edgeStart) {
+      return;
+    }
+
+    const deltaX = touch.clientX - start.startX;
+    const deltaY = touch.clientY - start.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (absX < 45 || absY > absX) {
+      return;
+    }
+
+    setMobileRolePanelOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12" onTouchStart={handleMobileSwipeStart} onTouchEnd={handleMobileSwipeEnd}>
       <div className="mx-auto max-w-5xl">
         <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" />
@@ -515,7 +553,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
       >
         <div className="relative h-full w-[102px]">
           <div className="pointer-events-none absolute inset-y-3 right-0 w-4 rounded-l-2xl border border-r-0 border-slate-300 bg-gradient-to-b from-white via-slate-100 to-white shadow-[0_0_18px_rgba(15,23,42,0.12)]" />
-          <div className="pointer-events-none absolute right-3 top-28 inline-flex h-9 w-[74px] items-center justify-center rounded-l-lg border border-r-0 border-slate-300 bg-white/95 px-2 text-xs font-semibold text-blue-700 shadow-sm truncate">
+          <div className="pointer-events-none absolute right-3 top-28 inline-flex h-9 items-center justify-center whitespace-nowrap rounded-l-lg border border-r-0 border-slate-300 bg-white/95 px-3 text-xs font-semibold text-blue-700 shadow-sm">
             {selectedRoleTitle}
           </div>
           <div className="pointer-events-none absolute right-[4px] bottom-8 h-8 w-[8px] rounded-l-full bg-slate-200/80" />
@@ -550,7 +588,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
                 <p className="text-xs text-slate-500">Select your account type</p>
                 <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                   <span className="text-[10px] uppercase tracking-wide text-blue-500">Selected role</span>
-                  <span className="truncate rounded border border-blue-200 bg-white px-1.5 py-0.5 text-blue-700">
+                  <span className="rounded border border-blue-200 bg-white px-1.5 py-0.5 whitespace-nowrap text-blue-700">
                     {selectedRoleTitle}
                   </span>
                 </div>

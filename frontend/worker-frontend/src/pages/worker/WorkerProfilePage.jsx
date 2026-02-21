@@ -1,11 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ChevronDown, User } from "lucide-react";
+
+const PHONE_REGEX = /^\d{10,13}$/;
 
 function toDateInputValue(date) {
   return date.toISOString().split("T")[0];
 }
 
-function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStatus, handleProfileSave }) {
+function normalizeWorkerProfileState(value = {}) {
+  return {
+    name: String(value.name || ""),
+    email: String(value.email || ""),
+    bio: String(value.bio || ""),
+    gender: String(value.gender || ""),
+    dateOfBirth: String(value.dateOfBirth || ""),
+    phone: String(value.phone || ""),
+    servicesProvided: String(value.servicesProvided || ""),
+    isAvailable: Boolean(value.isAvailable)
+  };
+}
+
+function WorkerProfilePage({ authToken, profileForm, profileInitialForm, setProfileForm, profileStatus, handleProfileSave }) {
+  const navigate = useNavigate();
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
   const servicesDropdownRef = useRef(null);
   const serviceOptions = [
@@ -36,6 +53,13 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
     date.setFullYear(date.getFullYear() - 18);
     return toDateInputValue(date);
   }, []);
+  const isProfileChanged = useMemo(() => {
+    const current = normalizeWorkerProfileState(profileForm);
+    const initial = normalizeWorkerProfileState(profileInitialForm);
+    return Object.keys(current).some((key) => current[key] !== initial[key]);
+  }, [profileForm, profileInitialForm]);
+  const normalizedPhone = String(profileForm.phone || "").trim();
+  const isPhoneValid = !normalizedPhone || PHONE_REGEX.test(normalizedPhone);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -68,11 +92,28 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
   const displayName = profileForm.name || "Worker";
   const displayEmail = profileForm.email || "No email set";
   const displayPhone = profileForm.phone || "No phone set";
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
 
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
       <div className="max-w-2xl mx-auto">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h3 className="text-xl font-bold text-gray-900">Profile Settings</h3>
+          <button
+            type="button"
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        </div>
         <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
           <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
             <User className="w-12 h-12 text-white" />
@@ -114,9 +155,17 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
               <input
                 type="tel"
                 value={profileForm.phone}
-                onChange={(event) => setProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
+                onChange={(event) =>
+                  setProfileForm((prev) => ({ ...prev, phone: String(event.target.value || "").replace(/\D/g, "").slice(0, 13) }))
+                }
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={13}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
               />
+              {normalizedPhone && !isPhoneValid && (
+                <p className="mt-1 text-xs text-red-600">Phone number must be 10 to 13 digits.</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -128,7 +177,6 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
                 <option value="">Prefer not to say</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
-                <option value="non-binary">Non-binary</option>
                 <option value="other">Other</option>
               </select>
             </div>
@@ -223,8 +271,12 @@ function WorkerProfilePage({ authToken, profileForm, setProfileForm, profileStat
             {profileStatus.success && <p className="rounded bg-green-100 px-3 py-2 text-sm text-green-700">{profileStatus.success}</p>}
             <button
               onClick={handleProfileSave}
-              disabled={profileStatus.loading}
-              className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-70"
+              disabled={profileStatus.loading || !isProfileChanged || !isPhoneValid}
+              className={`w-full sm:w-auto px-6 py-2.5 rounded-lg transition-colors font-medium ${
+                profileStatus.loading || !isProfileChanged || !isPhoneValid
+                  ? "bg-blue-200 text-blue-700 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
             >
               {profileStatus.loading ? "Saving..." : "Save Changes"}
             </button>

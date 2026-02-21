@@ -25,6 +25,8 @@ This README covers complete local setup from clone to first run, including envir
 13. [Data Model Overview](#data-model-overview)
 14. [Troubleshooting](#troubleshooting)
 15. [Security Notes](#security-notes)
+16. [Root Scripts](#root-scripts)
+17. [License and Usage](#license-and-usage)
 
 ## What This Project Includes
 
@@ -48,6 +50,7 @@ Short feature list by frontend is available in:
 - MongoDB + Mongoose
 - JWT authentication (`jsonwebtoken`)
 - Password hashing (`bcryptjs`)
+- Socket.IO (`socket.io`)
 - CORS + JSON middleware
 - `dotenv` for environment variables
 - `nodemon` for local development
@@ -58,6 +61,7 @@ Short feature list by frontend is available in:
 - Vite 5
 - Tailwind CSS
 - Axios (role-based frontends)
+- Socket.IO client (`socket.io-client`)
 - Lucide React icons
 
 ### Monorepo Tooling
@@ -208,6 +212,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_BROKER_APP_URL=http://localhost:5175
 VITE_WORKER_APP_URL=http://localhost:5176
+VITE_SOCKET_URL=http://localhost:5000
 VITE_PAGE_CACHE_TTL_MS=30000
 ```
 
@@ -220,6 +225,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_CUSTOMER_APP_URL=http://localhost:5174
 VITE_WORKER_APP_URL=http://localhost:5176
+VITE_SOCKET_URL=http://localhost:5000
 VITE_PAGE_CACHE_TTL_MS=30000
 ```
 
@@ -232,12 +238,14 @@ VITE_API_URL=http://localhost:5000/api
 VITE_LANDING_APP_URL=http://localhost:5173
 VITE_CUSTOMER_APP_URL=http://localhost:5174
 VITE_BROKER_APP_URL=http://localhost:5175
+VITE_SOCKET_URL=http://localhost:5000
 VITE_PAGE_CACHE_TTL_MS=30000
 ```
 
 Frontend cache reference:
 
 - `VITE_PAGE_CACHE_TTL_MS`: optional GET-response cache TTL (milliseconds) for faster page reloads in customer/broker/worker apps.
+- `VITE_SOCKET_URL`: optional explicit Socket.IO base URL (for example `http://localhost:5000`). If omitted, apps derive socket URL from `VITE_API_URL`.
 
 Render production API value for frontend services:
 
@@ -352,8 +360,19 @@ This runs `build` for all workspaces where the script exists.
 - Quick menus (notification/profile/mobile-nav) auto-collapse on outside click/tap, `Escape`, resize, blur, route changes, and real scroll movement.
 - Scroll auto-collapse includes a small mobile jitter guard so menus still open reliably at any scroll position.
 - Modal overlays use blur backgrounds (`backdrop-blur`) across auth/role-switch flows.
-- Settings header includes a plain text navigation link: `← back to dashboard`.
+- Mobile inner pages use `ArrowLeft + Back`; navigation goes to previous route when available, with dashboard fallback.
 - Browser tab icon (favicon) uses the Omni logo in landing + all role apps.
+
+### 7) Realtime Booking Sync (Socket.IO)
+
+- Backend authenticates socket connections using the same JWT token used for API calls.
+- Customer, broker, and worker apps subscribe to booking updates and refresh relevant dashboard data on `booking:changed`.
+- Optional frontend env `VITE_SOCKET_URL` can point directly to socket host; otherwise it is derived from `VITE_API_URL`.
+
+### 8) Profile Validation Rules
+
+- Phone number is optional, but if provided it must contain digits only and be 10-13 characters long.
+- Gender values currently supported are: `male`, `female`, `prefer_not_to_say`, and `other`.
 
 ## API Overview
 
@@ -475,3 +494,8 @@ From `package.json`:
 - `npm run dev:broker`
 - `npm run dev:worker`
 - `npm run build`
+
+## License and Usage
+
+This is a personal project. Do not copy, redistribute, or reuse this code outside authorized team members.
+

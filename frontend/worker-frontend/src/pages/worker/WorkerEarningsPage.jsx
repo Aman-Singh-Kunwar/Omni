@@ -1,5 +1,6 @@
 import React from "react";
-import { CheckCircle2, DollarSign, Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, DollarSign, Star } from "lucide-react";
 
 function StatCard({ icon: Icon, title, value }) {
   return (
@@ -18,8 +19,28 @@ function StatCard({ icon: Icon, title, value }) {
 }
 
 function WorkerEarningsPage({ stats, recentJobs }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-bold text-gray-900">Earnings</h3>
+        <button
+          type="button"
+          onClick={handleBackClick}
+          className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+      </div>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard icon={DollarSign} title="Total Earnings" value={`INR ${Number(stats.totalEarnings || 0).toLocaleString("en-IN")}`} />
         <StatCard icon={CheckCircle2} title="Completed Jobs" value={Number(stats.completedJobs || 0)} />

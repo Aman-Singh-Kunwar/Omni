@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import api from "../../api";
 
 function BrokerBookingsPage({ authToken, refreshSignal = 0 }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [brokerCode, setBrokerCode] = useState("");
@@ -49,7 +59,17 @@ function BrokerBookingsPage({ authToken, refreshSignal = 0 }) {
   return (
     <div className="space-y-6">
       <div className="bg-white/80 shadow-sm rounded-xl border px-4 py-5 sm:px-6">
-        <h3 className="text-lg leading-6 font-bold text-gray-900">Completed Bookings History</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg leading-6 font-bold text-gray-900">Completed Bookings History</h3>
+          <button
+            type="button"
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        </div>
         <p className="mt-1 text-sm text-gray-600">
           Showing only completed jobs from workers linked via your broker code
           {brokerCode ? <span className="font-semibold uppercase tracking-widest"> {brokerCode}</span> : ""}.

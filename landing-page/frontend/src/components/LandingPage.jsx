@@ -545,8 +545,8 @@ function LandingPage() {
                 <details key={item.id} className="group rounded-xl border border-gray-200 bg-white p-5">
                   <summary className="cursor-pointer list-none font-semibold text-gray-900 flex items-center justify-between gap-4">
                     {item.question}
-                    <span className="text-sm text-gray-500 group-open:hidden">Open</span>
-                    <span className="text-sm text-gray-500 hidden group-open:inline">Close</span>
+                    <span className="text-2xl font-semibold leading-none text-gray-500 group-open:hidden">+</span>
+                    <span className="text-2xl font-semibold leading-none text-gray-500 hidden group-open:inline">−</span>
                   </summary>
                   <p className="mt-3 text-gray-600">{item.answer}</p>
                 </details>

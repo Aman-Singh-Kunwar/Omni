@@ -40,7 +40,7 @@ function normalizeRoleProfileCommon(profile = {}) {
   const gender = normalizeString(next.gender).toLowerCase();
   next.bio = normalizeString(next.bio);
   next.phone = normalizeString(next.phone);
-  next.gender = ["male", "female", "non-binary", "prefer_not_to_say", "other"].includes(gender) ? gender : "";
+  next.gender = ["male", "female", "prefer_not_to_say", "other"].includes(gender) ? gender : "";
   return next;
 }
 
@@ -74,7 +74,7 @@ const roleProfileBaseSchema = {
   bio: { type: String, trim: true, maxlength: 500, default: "" },
   gender: {
     type: String,
-    enum: ["", "male", "female", "non-binary", "prefer_not_to_say", "other"],
+    enum: ["", "male", "female", "prefer_not_to_say", "other"],
     default: ""
   },
   dateOfBirth: { type: Date },

@@ -1,5 +1,6 @@
 import React from "react";
-import { MessageSquareText, Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, MessageSquareText, Star } from "lucide-react";
 
 function renderStars(rating) {
   return Array.from({ length: 5 }, (_, index) => (
@@ -11,6 +12,14 @@ function renderStars(rating) {
 }
 
 function WorkerReviewsPage({ reviews = [] }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
   const submittedReviews = reviews.filter((review) => {
     const rating = Number(review.rating || 0);
     const feedback = String(review.feedback || "").trim();
@@ -20,7 +29,17 @@ function WorkerReviewsPage({ reviews = [] }) {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-white/80 p-6 shadow-sm">
-        <h3 className="text-xl font-bold text-gray-900">Customer Reviews</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-xl font-bold text-gray-900">Customer Reviews</h3>
+          <button
+            type="button"
+            onClick={handleBackClick}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        </div>
         <p className="mt-1 text-sm text-gray-600">Feedback submitted by customers for completed or not-provided bookings.</p>
       </div>
 

@@ -1,5 +1,6 @@
-const GENDER_VALUES = ["male", "female", "non-binary", "prefer_not_to_say", "other"];
+const GENDER_VALUES = ["male", "female", "prefer_not_to_say", "other"];
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
+const PHONE_REGEX = /^\d{10,13}$/;
 
 const PROFILE_PATH_BY_ROLE = {
   customer: "customerProfile",
@@ -12,6 +13,21 @@ function normalizeString(value) {
     return "";
   }
   return value.trim();
+}
+
+function normalizePhone(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return "";
+  }
+
+  if (!PHONE_REGEX.test(normalized)) {
+    const error = new Error("Phone number must be 10 to 13 digits.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalized;
 }
 
 function normalizeGender(value) {
@@ -138,7 +154,7 @@ function toProfileDto(user) {
 function buildProfileUpdate(role, payload = {}) {
   const updates = {
     bio: normalizeString(payload.bio),
-    phone: normalizeString(payload.phone)
+    phone: normalizePhone(payload.phone)
   };
 
   const gender = normalizeGender(payload.gender);

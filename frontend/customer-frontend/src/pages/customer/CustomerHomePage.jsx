@@ -15,13 +15,35 @@ function CustomerHomePage({
   handleProviderBook,
   onToggleFavorite
 }) {
-  const WORKERS_BATCH_SIZE = 3;
-  const [visibleProvidersCount, setVisibleProvidersCount] = useState(WORKERS_BATCH_SIZE);
+  const MOBILE_BREAKPOINT_PX = 640;
+  const MOBILE_SERVICES_BATCH_SIZE = 4;
+  const MOBILE_WORKERS_BATCH_SIZE = 2;
+  const DEFAULT_WORKERS_BATCH_SIZE = 3;
+  const [isMobileView, setIsMobileView] = useState(
+    () => (typeof window !== "undefined" ? window.innerWidth < MOBILE_BREAKPOINT_PX : false)
+  );
+  const [visibleServicesCount, setVisibleServicesCount] = useState(MOBILE_SERVICES_BATCH_SIZE);
+  const [visibleProvidersCount, setVisibleProvidersCount] = useState(DEFAULT_WORKERS_BATCH_SIZE);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   useEffect(() => {
-    setVisibleProvidersCount(WORKERS_BATCH_SIZE);
-  }, [normalizedQuery, featuredProviders.length]);
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < MOBILE_BREAKPOINT_PX);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    setVisibleServicesCount(MOBILE_SERVICES_BATCH_SIZE);
+    setVisibleProvidersCount(isMobileView ? MOBILE_WORKERS_BATCH_SIZE : DEFAULT_WORKERS_BATCH_SIZE);
+  }, [normalizedQuery, featuredProviders.length, services.length, isMobileView]);
 
   const filteredServices = useMemo(() => {
     if (!normalizedQuery) {
@@ -43,8 +65,11 @@ function CustomerHomePage({
           : false)
     );
   }, [featuredProviders, normalizedQuery]);
-  const visibleProviders = filteredProviders.slice(0, visibleProvidersCount);
-  const hasMoreProviders = filteredProviders.length > visibleProvidersCount;
+  const visibleServices = isMobileView && !normalizedQuery ? filteredServices.slice(0, visibleServicesCount) : filteredServices;
+  const hasMoreServices = isMobileView && !normalizedQuery && filteredServices.length > visibleServicesCount;
+  const workerBatchSize = isMobileView ? MOBILE_WORKERS_BATCH_SIZE : DEFAULT_WORKERS_BATCH_SIZE;
+  const visibleProviders = isMobileView && !normalizedQuery ? filteredProviders.slice(0, visibleProvidersCount) : filteredProviders;
+  const hasMoreProviders = isMobileView && !normalizedQuery && filteredProviders.length > visibleProvidersCount;
 
   return (
     <>
@@ -112,7 +137,7 @@ function CustomerHomePage({
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-6">Popular Services</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
-            {filteredServices.map((service) => (
+            {visibleServices.map((service) => (
               <div
                 key={service.id}
                 onClick={() => handleServiceSelect(service)}
@@ -136,6 +161,16 @@ function CustomerHomePage({
               <p className="text-gray-600 col-span-full">No services match "{searchQuery.trim()}".</p>
             )}
           </div>
+          {hasMoreServices && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setVisibleServicesCount((prev) => prev + MOBILE_SERVICES_BATCH_SIZE)}
+                className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                More Services
+              </button>
+            </div>
+          )}
         </div>
 
         <div>
@@ -202,7 +237,7 @@ function CustomerHomePage({
           {!workersLoading && hasMoreProviders && (
             <div className="mt-6 flex justify-center">
               <button
-                onClick={() => setVisibleProvidersCount((prev) => prev + WORKERS_BATCH_SIZE)}
+                onClick={() => setVisibleProvidersCount((prev) => prev + workerBatchSize)}
                 className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 More Workers

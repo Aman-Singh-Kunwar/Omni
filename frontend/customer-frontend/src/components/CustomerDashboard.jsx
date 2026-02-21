@@ -147,6 +147,14 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     dateOfBirth: '',
     phone: ''
   });
+  const [profileInitialForm, setProfileInitialForm] = useState({
+    name: userName,
+    email: userEmail,
+    bio: '',
+    gender: '',
+    dateOfBirth: '',
+    phone: ''
+  });
   const [profileStatus, setProfileStatus] = useState({ loading: false, error: '', success: '' });
   const userMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
@@ -673,6 +681,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     if (!authToken) {
       if (needsProfileData) {
         setProfileForm(fallback);
+        setProfileInitialForm(fallback);
       }
       return;
     }
@@ -689,20 +698,34 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
 
         const user = response.data?.user || {};
         const profile = response.data?.profile || {};
-        setProfileForm({
+        const nextProfile = {
           name: user.name || fallback.name,
           email: user.email || fallback.email,
           bio: profile.bio || '',
           gender: profile.gender || '',
           dateOfBirth: profile.dateOfBirth ? String(profile.dateOfBirth).slice(0, 10) : '',
           phone: profile.phone || ''
-        });
+        };
+        setProfileForm(nextProfile);
+        setProfileInitialForm(nextProfile);
       } catch (_error) {
         setProfileForm(fallback);
+        setProfileInitialForm(fallback);
       }
     };
     loadProfile();
   }, [authToken, userEmail, userName, needsProfileData]);
+
+  useEffect(() => {
+    if (!profileStatus.success) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setProfileStatus((prev) => ({ ...prev, success: '' }));
+    }, 5000);
+    return () => window.clearTimeout(timerId);
+  }, [profileStatus.success]);
 
   const navigateToBooking = ({ source, serviceName, workerId = '' }) => {
     const params = new URLSearchParams();
@@ -1120,15 +1143,16 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       const user = response.data?.user || {};
       const profile = response.data?.profile || {};
 
-      setProfileForm((prev) => ({
-        ...prev,
-        name: user.name || prev.name,
-        email: user.email || prev.email,
+      const nextProfile = {
+        name: user.name || profileForm.name,
+        email: user.email || profileForm.email,
         bio: profile.bio || '',
         gender: profile.gender || '',
         dateOfBirth: profile.dateOfBirth ? String(profile.dateOfBirth).slice(0, 10) : '',
         phone: profile.phone || ''
-      }));
+      };
+      setProfileForm(nextProfile);
+      setProfileInitialForm(nextProfile);
       setProfileStatus({ loading: false, error: '', success: 'Profile updated.' });
     } catch (error) {
       setProfileStatus({
@@ -1264,6 +1288,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           userName={userName}
           userEmail={userEmail}
           profileForm={profileForm}
+          profileInitialForm={profileInitialForm}
           setProfileForm={setProfileForm}
           profileStatus={profileStatus}
           handleProfileSave={handleProfileSave}
@@ -1344,7 +1369,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                     </span>
                   </button>
                   {showNotifications && (
-                    <div className="fixed left-14 right-2 top-16 z-50 overflow-hidden rounded-lg border bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]">
+                    <div className="fixed right-2 top-16 z-50 w-[70vw] max-w-[260px] overflow-hidden rounded-lg border bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]">
                       <div className="px-4 py-3 border-b flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">Notifications</p>
                         <span className="text-xs text-gray-500">{unreadNotificationCount} unread</span>
@@ -1374,18 +1399,18 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
                           <p className="px-4 py-6 text-sm text-gray-500">No notifications.</p>
                         )}
                       </div>
-                      <div className="border-t px-3 py-2 grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1.5 border-t px-2 py-1.5">
                         <button
                           type="button"
                           onClick={handleMarkAllNotificationsRead}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                          className="whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                         >
                           Mark all read
                         </button>
                         <button
                           type="button"
                           onClick={handleClearNotifications}
-                          className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          className="whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-1.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                         >
                           Clear notifications
                         </button>

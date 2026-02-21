@@ -1,10 +1,30 @@
 import React from "react";
-import { Heart } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Heart } from "lucide-react";
 
 function CustomerFavoritesPage({ favoriteProviders, renderStars, onToggleFavorite, onBookProvider }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Favorite Providers</h3>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h3 className="text-xl font-bold text-gray-900">Favorite Providers</h3>
+        <button
+          type="button"
+          onClick={handleBackClick}
+          className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {favoriteProviders.map((provider) => (
           <div key={provider.id} className="border p-6 rounded-lg bg-white/60">

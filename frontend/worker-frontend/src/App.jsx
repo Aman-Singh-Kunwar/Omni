@@ -57,6 +57,10 @@ function App() {
   const dashboardPaths = useMemo(() => ["/", "/job-requests", "/schedule", "/earnings", "/reviews", "/profile", "/settings"], []);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     const bootstrapAuth = async () => {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get("authToken");

@@ -1,9 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { Clock3, CreditCard, Mail, Phone, Trash2, Wrench } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Car, Clock3, CreditCard, Droplets, Home, Mail, Paintbrush, Phone, Scissors, Trash2, Wind, Wrench, Zap } from "lucide-react";
 
 const CANCEL_WINDOW_MS = 10 * 60 * 1000;
 const cancelEligibleStatuses = new Set(["pending", "confirmed", "upcoming"]);
 const reviewEligibleStatuses = new Set(["confirmed", "in-progress", "completed", "not-provided"]);
+const SERVICE_VISUALS = [
+  { tokens: ["plumber", "plumbing"], icon: Droplets, containerClass: "bg-blue-100", iconClass: "text-blue-600" },
+  { tokens: ["electrician", "electrical"], icon: Zap, containerClass: "bg-yellow-100", iconClass: "text-yellow-600" },
+  { tokens: ["carpenter", "carpentry"], icon: Wrench, containerClass: "bg-orange-100", iconClass: "text-orange-600" },
+  { tokens: ["painter", "painting"], icon: Paintbrush, containerClass: "bg-green-100", iconClass: "text-green-600" },
+  { tokens: ["ac repair", "ac service", "air conditioning"], icon: Wind, containerClass: "bg-cyan-100", iconClass: "text-cyan-600" },
+  { tokens: ["house cleaning", "cleaning"], icon: Home, containerClass: "bg-purple-100", iconClass: "text-purple-600" },
+  { tokens: ["hair stylist", "hair", "salon"], icon: Scissors, containerClass: "bg-pink-100", iconClass: "text-pink-600" },
+  { tokens: ["car service", "car wash", "vehicle"], icon: Car, containerClass: "bg-gray-200", iconClass: "text-gray-700" }
+];
 
 function formatStatusLabel(status) {
   return String(status || "")
@@ -18,6 +29,18 @@ function formatRemainingMs(ms) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getServiceVisual(serviceName) {
+  const normalizedName = String(serviceName || "").trim().toLowerCase();
+  const matched = SERVICE_VISUALS.find((entry) => entry.tokens.some((token) => normalizedName.includes(token)));
+  return (
+    matched || {
+      icon: Wrench,
+      containerClass: "bg-blue-100",
+      iconClass: "text-blue-600"
+    }
+  );
 }
 
 function CustomerBookingsPage({
@@ -40,6 +63,14 @@ function CustomerBookingsPage({
   reviewLoadingBookingId = "",
   reviewError = ""
 }) {
+  const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
   const [nowTs, setNowTs] = useState(Date.now());
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [openReviewByBookingId, setOpenReviewByBookingId] = useState({});
@@ -74,22 +105,40 @@ function CustomerBookingsPage({
 
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">My Bookings</h3>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h3 className="text-xl font-bold text-gray-900">My Bookings</h3>
+        <button
+          type="button"
+          onClick={handleBackClick}
+          className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 sm:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+      </div>
       {cancelError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{cancelError}</p>}
       {payError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{payError}</p>}
       {notProvidedError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{notProvidedError}</p>}
       {deleteError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{deleteError}</p>}
       {reviewError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{reviewError}</p>}
       <div className="space-y-4">
-        {recentBookings.map((booking) => (
+        {recentBookings.map((booking) => {
+          const serviceVisual = getServiceVisual(booking.service);
+          const ServiceIcon = serviceVisual.icon;
+          return (
           <div key={booking.id} className="border p-4 sm:p-6 rounded-lg bg-white/60">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex w-full min-w-0 items-center space-x-3 sm:space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                  <Wrench className="w-6 h-6 text-blue-600" />
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${serviceVisual.containerClass}`}>
+                  <ServiceIcon className={`w-6 h-6 ${serviceVisual.iconClass}`} />
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">{booking.service}</h4>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-gray-900">{booking.service}</h4>
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium sm:hidden ${getStatusColor(booking.status)}`}>
+                      {formatStatusLabel(booking.status)}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-600">with {booking.provider}</p>
                   <p className="text-sm text-gray-500 mt-1">
                     {booking.date} at {booking.time}
@@ -109,8 +158,41 @@ function CustomerBookingsPage({
                   )}
                 </div>
               </div>
-              <div className="text-left sm:text-right w-full sm:w-auto">
-                <div className="mb-2 flex justify-start sm:justify-end">
+              <div className="w-full sm:w-auto text-left sm:text-right">
+                {booking.rating && <div className="mt-2 flex items-center sm:hidden">{renderStars(booking.rating)}</div>}
+                <div
+                  className={`mt-2 flex items-center sm:hidden ${reviewEligibleStatuses.has(booking.status) ? "justify-between" : "justify-end"}`}
+                >
+                  {reviewEligibleStatuses.has(booking.status) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenReviewByBookingId((prev) => ({
+                          ...prev,
+                          [booking.id]: !prev[booking.id]
+                        }))
+                      }
+                      className="inline-flex h-8 items-center text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      {booking.rating || booking.feedback ? "Edit Feedback" : "Give Feedback"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onDeleteBooking?.(booking.id)}
+                    disabled={
+                      cancelLoadingBookingId === booking.id ||
+                      payLoadingBookingId === booking.id ||
+                      reviewLoadingBookingId === booking.id ||
+                      deleteLoadingBookingId === booking.id
+                    }
+                    aria-label="Delete booking"
+                    className="-translate-y-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-70"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-col sm:items-end sm:gap-2">
                   <button
                     type="button"
                     onClick={() => onDeleteBooking?.(booking.id)}
@@ -125,25 +207,25 @@ function CustomerBookingsPage({
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                  <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}>
+                    {formatStatusLabel(booking.status)}
+                  </span>
+                  {booking.rating && <div className="flex items-center">{renderStars(booking.rating)}</div>}
+                  {reviewEligibleStatuses.has(booking.status) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenReviewByBookingId((prev) => ({
+                          ...prev,
+                          [booking.id]: !prev[booking.id]
+                        }))
+                      }
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      {booking.rating || booking.feedback ? "Edit Feedback" : "Give Feedback"}
+                    </button>
+                  )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
-                  {formatStatusLabel(booking.status)}
-                </span>
-                {booking.rating && <div className="flex items-center mt-2 justify-start sm:justify-end">{renderStars(booking.rating)}</div>}
-                {reviewEligibleStatuses.has(booking.status) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenReviewByBookingId((prev) => ({
-                        ...prev,
-                        [booking.id]: !prev[booking.id]
-                      }))
-                    }
-                    className="mt-2 block text-xs font-semibold text-blue-600 hover:underline sm:ml-auto"
-                  >
-                    {booking.rating || booking.feedback ? "Edit Feedback" : "Give Feedback"}
-                  </button>
-                )}
               </div>
             </div>
 
@@ -270,7 +352,8 @@ function CustomerBookingsPage({
               </div>
             )}
           </div>
-        ))}
+        );
+        })}
         {recentBookings.length === 0 && <p className="text-sm text-gray-500">No bookings found for this account.</p>}
       </div>
     </div>
