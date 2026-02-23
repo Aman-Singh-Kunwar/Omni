@@ -43,8 +43,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
-  const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, edgeStart: false });
-  const MOBILE_ROLE_EDGE_TRIGGER_WIDTH = 28;
+  const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, active: false, opened: false });
   useAutoDismissStatus(status, setStatus);
   useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
 
@@ -333,27 +332,39 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   }));
   const selectedRoleTitle = roleMeta[selectedRole]?.title || "Customer";
 
-  const handleMobileSwipeStart = (event) => {
+  const handleEdgeSwipeStart = (event) => {
+    if (mobileRolePanelOpen || verification.pending) {
+      return;
+    }
+
     const touch = event.touches?.[0];
     if (!touch) {
       return;
     }
 
-    const viewportWidth = window.innerWidth || 0;
     mobileRoleSwipeRef.current = {
       startX: touch.clientX,
       startY: touch.clientY,
-      edgeStart: touch.clientX >= viewportWidth - MOBILE_ROLE_EDGE_TRIGGER_WIDTH
+      active: true,
+      opened: false
     };
   };
 
-  const tryOpenRolePanelFromEdgeGesture = (touch) => {
+  const openRolePanel = () => {
     if (mobileRolePanelOpen || verification.pending) {
       return;
     }
+    setMobileRolePanelOpen(true);
+  };
 
+  const handleEdgeSwipeMove = (event) => {
     const start = mobileRoleSwipeRef.current;
-    if (!touch || !start.edgeStart) {
+    if (!start.active || start.opened) {
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) {
       return;
     }
 
@@ -362,35 +373,29 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
 
-    // Require a left swipe from the right edge to avoid accidental opens while vertical scrolling.
-    if (deltaX > -36 || absX < 36 || absY > absX) {
+    // Ignore tiny drags and clear vertical scrolling gestures quickly.
+    if (absY > 18 && absY > absX) {
+      mobileRoleSwipeRef.current = { ...start, active: false };
       return;
     }
 
-    setMobileRolePanelOpen(true);
-    mobileRoleSwipeRef.current = {
-      ...start,
-      edgeStart: false
-    };
+    if (absX < 20) {
+      return;
+    }
+
+    // Open only for an intentional left swipe from the right edge trigger.
+    if (deltaX <= -28 && absY < absX * 0.8) {
+      mobileRoleSwipeRef.current = { ...start, active: false, opened: true };
+      openRolePanel();
+    }
   };
 
-  const handleMobileSwipeMove = (event) => {
-    const touch = event.touches?.[0];
-    tryOpenRolePanelFromEdgeGesture(touch);
-  };
-
-  const handleMobileSwipeEnd = (event) => {
-    const touch = event.changedTouches?.[0];
-    tryOpenRolePanelFromEdgeGesture(touch);
+  const handleEdgeSwipeEnd = () => {
+    mobileRoleSwipeRef.current = { startX: 0, startY: 0, active: false, opened: false };
   };
 
   return (
-    <div
-      className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12"
-      onTouchStart={handleMobileSwipeStart}
-      onTouchMove={handleMobileSwipeMove}
-      onTouchEnd={handleMobileSwipeEnd}
-    >
+    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" />
@@ -603,9 +608,14 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           <button
             type="button"
             disabled={verification.pending}
-            onClick={() => setMobileRolePanelOpen(true)}
+            onClick={openRolePanel}
+            onTouchStart={handleEdgeSwipeStart}
+            onTouchMove={handleEdgeSwipeMove}
+            onTouchEnd={handleEdgeSwipeEnd}
+            onTouchCancel={handleEdgeSwipeEnd}
             className="pointer-events-auto absolute inset-y-0 right-0 w-7 bg-transparent disabled:cursor-not-allowed ui-no-hover-lift"
             aria-label="Open role selector from right edge"
+            style={{ touchAction: "pan-y" }}
           />
           <div className="pointer-events-none absolute inset-y-3 right-0 w-4 rounded-l-2xl border border-r-0 border-slate-300 bg-gradient-to-b from-white via-slate-100 to-white shadow-[0_0_18px_rgba(15,23,42,0.12)]" />
           <div className="pointer-events-none absolute right-3 top-28 inline-flex h-9 items-center justify-center whitespace-nowrap rounded-l-lg border border-r-0 border-slate-300 bg-white/95 px-3 text-xs font-semibold text-blue-700 shadow-sm">
@@ -615,7 +625,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           <button
             type="button"
             disabled={verification.pending}
-            onClick={() => setMobileRolePanelOpen(true)}
+            onClick={openRolePanel}
             className="pointer-events-auto absolute right-0 top-1/2 inline-flex h-[60px] w-6 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-slate-300 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 ui-no-hover-lift"
             aria-label="Open role selector"
           >
