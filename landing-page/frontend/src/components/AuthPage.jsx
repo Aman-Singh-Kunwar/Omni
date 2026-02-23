@@ -626,8 +626,13 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
             type="button"
             disabled={verification.pending}
             onClick={openRolePanel}
+            onTouchStart={handleEdgeSwipeStart}
+            onTouchMove={handleEdgeSwipeMove}
+            onTouchEnd={handleEdgeSwipeEnd}
+            onTouchCancel={handleEdgeSwipeEnd}
             className="pointer-events-auto absolute right-0 top-1/2 inline-flex h-[60px] w-6 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-slate-300 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 ui-no-hover-lift"
             aria-label="Open role selector"
+            style={{ touchAction: "pan-y" }}
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
