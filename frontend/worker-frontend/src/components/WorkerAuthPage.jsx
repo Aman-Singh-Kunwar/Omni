@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import api from "../api";
+import { useAutoDismissStatus } from "@shared/hooks/useAutoDismissNotice";
 
 const role = "worker";
 
@@ -28,6 +29,7 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [status, setStatus] = useState({ loading: false, error: "", info: "" });
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState("request");
@@ -40,6 +42,14 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
   const [forgotPasswordStatus, setForgotPasswordStatus] = useState({ loading: false, error: "", info: "" });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+  useAutoDismissStatus(status, setStatus);
+  useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
+
+  useEffect(() => {
+    setStatus({ loading: false, error: "", info: "" });
+    setForgotPasswordStatus({ loading: false, error: "", info: "" });
+    setForgotPasswordOpen(false);
+  }, [mode]);
 
   const normalizeEmail = () => String(form.email || "").trim().toLowerCase();
   const normalizeBrokerCode = () =>
@@ -76,7 +86,7 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
       return;
     }
 
-    onSuccess({ user: response.data.user, token: response.data.token || "" });
+    onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
     navigate(redirectPath, { replace: true });
   };
 
@@ -95,7 +105,7 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
       verificationCode
     });
 
-    onSuccess({ user: response.data.user, token: response.data.token || "" });
+    onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
     navigate(redirectPath, { replace: true });
   };
 
@@ -239,7 +249,7 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
       }
 
       const response = await api.post("/auth/login", { email: form.email, password: form.password, role });
-      onSuccess({ user: response.data.user, token: response.data.token || "" });
+      onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
       navigate(redirectPath, { replace: true });
     } catch (error) {
       setStatus({ loading: false, error: error.response?.data?.message || "Authentication failed.", info: "" });
@@ -297,41 +307,45 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Password</span>
-            <input
-              type={showPassword ? "text" : "password"}
-              className="w-full rounded-lg border px-3 py-2"
-              disabled={mode === "signup" && verification.pending}
-              value={form.password}
-              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              disabled={mode === "signup" && verification.pending}
-              onChange={(event) => setShowPassword(event.target.checked)}
-            />
-            Show password
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full rounded-lg border px-3 py-2 pr-10"
+                disabled={mode === "signup" && verification.pending}
+                value={form.password}
+                onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                disabled={mode === "signup" && verification.pending}
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 disabled:opacity-50"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </label>
           {mode === "signup" && !verification.pending && (
             <>
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</span>
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  className="w-full rounded-lg border px-3 py-2"
-                  value={form.confirmPassword}
-                  onChange={(event) => setForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
-                />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={showConfirmPassword}
-                  onChange={(event) => setShowConfirmPassword(event.target.checked)}
-                />
-                Show confirm password
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    className="w-full rounded-lg border px-3 py-2 pr-10"
+                    value={form.confirmPassword}
+                    onChange={(event) => setForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </label>
               <button
                 type="button"
@@ -407,6 +421,16 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
           )}
         </div>
 
+        <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+          />
+          Remember me
+        </label>
+
         {status.info && <p className="mt-4 rounded bg-emerald-50 p-2 text-sm text-emerald-700">{status.info}</p>}
         {status.error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{status.error}</p>}
 
@@ -475,37 +499,41 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">New Password</span>
-                    <input
-                      type={showForgotPassword ? "text" : "password"}
-                      className="w-full rounded-lg border px-3 py-2"
-                      value={forgotPasswordForm.newPassword}
-                      onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={showForgotPassword}
-                      onChange={(event) => setShowForgotPassword(event.target.checked)}
-                    />
-                    Show new password
+                    <div className="relative">
+                      <input
+                        type={showForgotPassword ? "text" : "password"}
+                        className="w-full rounded-lg border px-3 py-2 pr-10"
+                        value={forgotPasswordForm.newPassword}
+                        onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showForgotPassword ? "Hide new password" : "Show new password"}
+                        onClick={() => setShowForgotPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700"
+                      >
+                        {showForgotPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Confirm New Password</span>
-                    <input
-                      type={showForgotConfirmPassword ? "text" : "password"}
-                      className="w-full rounded-lg border px-3 py-2"
-                      value={forgotPasswordForm.confirmNewPassword}
-                      onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, confirmNewPassword: event.target.value }))}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={showForgotConfirmPassword}
-                      onChange={(event) => setShowForgotConfirmPassword(event.target.checked)}
-                    />
-                    Show confirm password
+                    <div className="relative">
+                      <input
+                        type={showForgotConfirmPassword ? "text" : "password"}
+                        className="w-full rounded-lg border px-3 py-2 pr-10"
+                        value={forgotPasswordForm.confirmNewPassword}
+                        onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, confirmNewPassword: event.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showForgotConfirmPassword ? "Hide confirm new password" : "Show confirm new password"}
+                        onClick={() => setShowForgotConfirmPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700"
+                      >
+                        {showForgotConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </label>
                 </>
               )}
@@ -549,3 +577,4 @@ function WorkerAuthPage({ mode = "login", onSuccess }) {
 }
 
 export default WorkerAuthPage;
+

@@ -15,6 +15,12 @@ body,
   min-height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -22,11 +28,201 @@ body {
   overflow-x: hidden;
 }
 
+:root {
+  --ui-motion-fast: 150ms;
+  --ui-motion-base: 220ms;
+  --ui-motion-slow: 300ms;
+  --ui-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ui-ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ui-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.24);
+}
+
 img,
 video,
 canvas,
 svg {
   max-width: 100%;
+}
+
+@keyframes ui-mobile-press {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0.97);
+  }
+}
+
+@keyframes ui-mobile-nav-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-popover-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-modal-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-modal-scale-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-drawer-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Reusable mobile/touch helpers */
+.ui-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+.ui-touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.ui-mobile-nav-enter {
+  animation: ui-mobile-nav-enter var(--ui-motion-base) var(--ui-ease-standard);
+}
+
+.ui-popover-enter {
+  transform-origin: top right;
+  animation: ui-popover-enter var(--ui-motion-base) var(--ui-ease-standard);
+}
+
+.ui-modal-overlay {
+  animation: ui-modal-fade-in var(--ui-motion-base) var(--ui-ease-standard);
+}
+
+.ui-modal-surface {
+  animation: ui-modal-scale-in var(--ui-motion-slow) var(--ui-ease-standard);
+}
+
+.ui-mobile-drawer {
+  animation: ui-drawer-slide-in var(--ui-motion-base) var(--ui-ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(button, a[href], summary, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) {
+    transition:
+      transform var(--ui-motion-base) var(--ui-ease-standard),
+      box-shadow var(--ui-motion-base) var(--ui-ease-standard),
+      filter var(--ui-motion-base) var(--ui-ease-standard),
+      background-color var(--ui-motion-base) var(--ui-ease-standard),
+      color var(--ui-motion-base) var(--ui-ease-standard),
+      border-color var(--ui-motion-base) var(--ui-ease-standard);
+    will-change: transform;
+  }
+
+  :is(button, a[href], summary, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):hover {
+    transform: translateY(-1px);
+  }
+
+  :is(button, a[href], summary, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  :is(
+      .rounded-xl,
+      .rounded-2xl,
+      .rounded-3xl,
+      .shadow-sm,
+      .shadow,
+      .shadow-md,
+      .shadow-lg,
+      .glass-card
+    ) {
+    transition:
+      transform var(--ui-motion-slow) var(--ui-ease-snappy),
+      box-shadow var(--ui-motion-slow) var(--ui-ease-snappy),
+      border-color var(--ui-motion-slow) var(--ui-ease-snappy);
+  }
+
+  :is(
+      .rounded-xl,
+      .rounded-2xl,
+      .rounded-3xl,
+      .shadow-sm,
+      .shadow,
+      .shadow-md,
+      .shadow-lg,
+      .glass-card
+    ):hover {
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  :is(button, a[href], summary, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) {
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform var(--ui-motion-fast) var(--ui-ease-snappy),
+      filter var(--ui-motion-fast) var(--ui-ease-snappy),
+      background-color var(--ui-motion-fast) var(--ui-ease-snappy),
+      color var(--ui-motion-fast) var(--ui-ease-snappy),
+      border-color var(--ui-motion-fast) var(--ui-ease-snappy);
+  }
+
+  :is(button, a[href], summary, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]):active {
+    transform: scale(0.97);
+    filter: brightness(0.97) saturate(0.98);
+  }
+
+  .ui-touch-scroll {
+    scroll-behavior: smooth;
+  }
+}
+
+:is(button, a[href], summary, [role="button"], input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
 
 @media (max-width: 640px) {

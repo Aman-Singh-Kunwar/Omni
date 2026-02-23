@@ -1,5 +1,5 @@
 import express from "express";
-import publicRoutes from "./publicRoutes.js";
+import publicRoutes from "./public/index.js";
 import roleRoutes from "./roleRoutes.js";
 import accountRoutes from "./accountRoutes.js";
 

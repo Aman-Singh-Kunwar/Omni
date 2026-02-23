@@ -3,29 +3,21 @@ import { useLocation, useNavigate } from "react-router-dom";
 import omniLogo from '../assets/images/omni-logo.png';
 import api from '../api';
 import {
-  Bell,
-  User,
   Calendar,
   Star,
   Heart,
-  Settings,
-  LogOut,
   Home,
-  Wrench,
-  Zap,
-  Paintbrush,
-  Droplets,
-  Wind,
-  Scissors,
-  Car,
-  MoreVertical,
-  X,
-  ChevronDown,
-  Briefcase
+  Wrench
 } from 'lucide-react';
 import { toShortErrorMessage, toStableId } from "@shared/utils/common";
 import { createRealtimeSocket } from "@shared/utils/realtime";
 import useQuickMenuAutoClose from "@shared/hooks/useQuickMenuAutoClose";
+import { useAutoDismissStatus } from "@shared/hooks/useAutoDismissNotice";
+import PageLoaderCard from "@shared/components/PageLoaderCard";
+import CustomerRoleSwitchModal from "./customer-dashboard/CustomerRoleSwitchModal";
+import CustomerTopNav from "./customer-dashboard/CustomerTopNav";
+import { BASE_SERVICES, landingUrl } from "./customer-dashboard/constants";
+import { formatInr, getRandomServicePrice, toFavoriteProvider } from "./customer-dashboard/utils";
 
 const CustomerHomePage = lazy(() => import('../pages/customer/CustomerHomePage'));
 const CustomerBookingFormPage = lazy(() => import('../pages/customer/CustomerBookingFormPage'));
@@ -33,74 +25,6 @@ const CustomerBookingsPage = lazy(() => import('../pages/customer/CustomerBookin
 const CustomerFavoritesPage = lazy(() => import('../pages/customer/CustomerFavoritesPage'));
 const CustomerProfilePage = lazy(() => import('../pages/customer/CustomerProfilePage'));
 const CustomerSettingsPage = lazy(() => import('../pages/customer/CustomerSettingsPage'));
-
-const SERVICE_PRICE_MIN = 250;
-const SERVICE_PRICE_MAX = 2500;
-const SERVICE_PRICE_STEP = 50;
-const defaultLandingUrl = import.meta.env.PROD ? "https://omni-landing-page.onrender.com" : "http://localhost:5173";
-const landingUrl = import.meta.env.VITE_LANDING_APP_URL || defaultLandingUrl;
-
-const BASE_SERVICES = [
-  { id: 1, name: 'Plumber', icon: Droplets, color: 'bg-blue-500', rating: 4.8 },
-  { id: 2, name: 'Electrician', icon: Zap, color: 'bg-yellow-500', rating: 4.9 },
-  { id: 3, name: 'Carpenter', icon: Wrench, color: 'bg-orange-500', rating: 4.7 },
-  { id: 4, name: 'Painter', icon: Paintbrush, color: 'bg-green-500', rating: 4.6 },
-  { id: 5, name: 'AC Repair', icon: Wind, color: 'bg-cyan-500', rating: 4.8 },
-  { id: 6, name: 'House Cleaning', icon: Home, color: 'bg-purple-500', rating: 4.9 },
-  { id: 7, name: 'Hair Stylist', icon: Scissors, color: 'bg-pink-500', rating: 4.7 },
-  { id: 8, name: 'Car Service', icon: Car, color: 'bg-gray-600', rating: 4.5 }
-];
-
-function PageLoader() {
-  return <div className="rounded-xl border bg-white/70 p-6 text-sm font-medium text-gray-600">Loading section...</div>;
-}
-
-function hashServiceName(name) {
-  return Array.from(String(name || '')).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0);
-}
-
-function getRandomServicePrice(serviceName) {
-  const stepCount = Math.floor((SERVICE_PRICE_MAX - SERVICE_PRICE_MIN) / SERVICE_PRICE_STEP) + 1;
-  const offset = hashServiceName(serviceName) % stepCount;
-  return SERVICE_PRICE_MIN + offset * SERVICE_PRICE_STEP;
-}
-
-function formatInr(amount) {
-  return `INR ${Number(amount || 0).toLocaleString('en-IN')}`;
-}
-
-function toFavoriteProvider(provider = {}) {
-  const id = String(provider.id || '').trim();
-  if (!id) {
-    return null;
-  }
-
-  const name = String(provider.name || 'Worker').trim() || 'Worker';
-  const servicesProvided = Array.isArray(provider.servicesProvided)
-    ? provider.servicesProvided.map((service) => String(service || '').trim()).filter(Boolean)
-    : [];
-  const service = String(provider.service || servicesProvided[0] || 'General Service').trim() || 'General Service';
-  const numericRating = Number(provider.rating || 0);
-  const numericReviews = Number(provider.reviews || 0);
-  const fallbackImage = name
-    .split(' ')
-    .map((chunk) => chunk[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  return {
-    id,
-    name,
-    service,
-    servicesProvided,
-    rating: Number.isFinite(numericRating) ? numericRating : 0,
-    reviews: Number.isFinite(numericReviews) ? numericReviews : 0,
-    image: String(provider.image || fallbackImage || 'W')
-      .slice(0, 2)
-      .toUpperCase()
-  };
-}
 
 const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Johnson', userEmail = '', authToken = '' }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +47,9 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     applyDiscount: true,
     date: '',
     time: '',
-    location: 'Dehradun',
+    location: '',
+    locationLat: '',
+    locationLng: '',
     description: ''
   });
   const [bookingStatus, setBookingStatus] = useState({ loading: false, error: '' });
@@ -156,6 +82,14 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     phone: ''
   });
   const [profileStatus, setProfileStatus] = useState({ loading: false, error: '', success: '' });
+  useAutoDismissStatus(roleSwitchStatus, setRoleSwitchStatus);
+  useAutoDismissStatus(bookingStatus, setBookingStatus);
+  useAutoDismissStatus(cancelStatus, setCancelStatus);
+  useAutoDismissStatus(paymentStatus, setPaymentStatus);
+  useAutoDismissStatus(notProvidedStatus, setNotProvidedStatus);
+  useAutoDismissStatus(deleteStatus, setDeleteStatus);
+  useAutoDismissStatus(reviewStatus, setReviewStatus);
+  useAutoDismissStatus(profileStatus, setProfileStatus);
   const userMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const navRef = useRef(null);
@@ -716,17 +650,6 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     loadProfile();
   }, [authToken, userEmail, userName, needsProfileData]);
 
-  useEffect(() => {
-    if (!profileStatus.success) {
-      return undefined;
-    }
-
-    const timerId = window.setTimeout(() => {
-      setProfileStatus((prev) => ({ ...prev, success: '' }));
-    }, 5000);
-    return () => window.clearTimeout(timerId);
-  }, [profileStatus.success]);
-
   const navigateToBooking = ({ source, serviceName, workerId = '' }) => {
     const params = new URLSearchParams();
     params.set('source', source === 'worker' ? 'worker' : 'service');
@@ -753,7 +676,9 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
       applyDiscount: true,
       date: '',
       time: '',
-      location: 'Dehradun',
+      location: '',
+      locationLat: '',
+      locationLng: '',
       description: ''
     });
     if (navigateHome) {
@@ -1320,278 +1245,50 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     <>
       <GlobalStyles />
       <div className="min-h-screen bg-gray-50 animated-gradient">
-        <nav ref={navRef} className="bg-white shadow-sm border-b sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-3 sm:space-x-8">
-                <a
-                  href={landingUrl}
-                  data-public-navigation="true"
-                  className="flex items-center space-x-2 transition-opacity hover:opacity-90"
-                  aria-label="Go to Omni landing page"
-                >
-                  <img src={omniLogo} alt="Omni Logo" className="h-8 w-8 mr-2" />
-                  <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Omni</h1>
-                </a>
-
-                <div className="hidden md:flex items-center space-x-1">
-                  {navItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => navigateToTab(item.id)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                        activeTab === item.id
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                      }`}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 sm:space-x-4">
-                <div ref={notificationMenuRef} className="relative">
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      setShowMobileMenu(false);
-                      setShowNotifications((prev) => !prev);
-                    }}
-                    className="relative p-2 text-gray-400 hover:text-gray-600"
-                    aria-label="Open notifications"
-                  >
-                    <Bell className="w-5 h-5" />
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
-                    </span>
-                  </button>
-                  {showNotifications && (
-                    <div className="fixed right-2 top-16 z-50 w-[70vw] max-w-[260px] overflow-hidden rounded-lg border bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]">
-                      <div className="px-4 py-3 border-b flex items-center justify-between">
-                        <p className="text-sm font-semibold text-gray-900">Notifications</p>
-                        <span className="text-xs text-gray-500">{unreadNotificationCount} unread</span>
-                      </div>
-                      <div className="h-44 overflow-y-auto">
-                        {visibleNotificationItems.length ? (
-                          visibleNotificationItems.map((notification) => {
-                            const normalizedNotificationId = toStableId(notification.id);
-                            const isRead = readNotificationIds.includes(normalizedNotificationId);
-                            return (
-                              <button
-                                key={normalizedNotificationId}
-                                type="button"
-                                onClick={() => handleNotificationClick(notification)}
-                                className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
-                                  isRead ? 'bg-gray-50' : 'bg-blue-50/40'
-                                }`}
-                              >
-                                <p className={`text-sm ${isRead ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`}>
-                                  {notification.title}
-                                </p>
-                                <p className={`text-xs mt-0.5 ${isRead ? 'text-gray-400' : 'text-gray-600'}`}>{notification.message}</p>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <p className="px-4 py-6 text-sm text-gray-500">No notifications.</p>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5 border-t px-2 py-1.5">
-                        <button
-                          type="button"
-                          onClick={handleMarkAllNotificationsRead}
-                          className="whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                        >
-                          Mark all read
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleClearNotifications}
-                          className="whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-1.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                        >
-                          Clear notifications
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button onClick={() => navigateToTab('settings')} className="p-2 text-gray-400 hover:text-gray-600">
-                  <Settings className="w-5 h-5" />
-                </button>
-
-                <div ref={userMenuRef} className="relative">
-                  <button
-                    onClick={() => {
-                      setShowNotifications(false);
-                      setShowMobileMenu(false);
-                      setShowUserMenu((prev) => !prev);
-                    }}
-                    className="hidden md:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="text-sm text-left">
-                      <p className="font-medium text-gray-900">{userName}</p>
-                      <p className="text-gray-500 text-xs">Customer</p>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowNotifications(false);
-                      setShowMobileMenu(false);
-                      setShowUserMenu((prev) => !prev);
-                    }}
-                    className="md:hidden p-2 text-gray-500 hover:text-gray-700"
-                    aria-label="Open profile menu"
-                  >
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  </button>
-
-                  {showUserMenu && (
-                    <div className="fixed right-2 top-16 w-44 bg-white rounded-md shadow-lg py-1 z-50 border sm:absolute sm:right-0 sm:top-auto sm:mt-2 sm:w-48">
-                      <button
-                        onClick={() => {
-                          navigateToTab('profile');
-                          setShowUserMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                      >
-                        <User className="w-4 h-4 mr-3" />
-                        Profile
-                      </button>
-                      <button
-                        onClick={() => {
-                          setRoleSwitchStatus({ loading: false, error: '' });
-                          setShowRoleSwitchModal(true);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                      >
-                        <Briefcase className="w-4 h-4 mr-3" />
-                        Switch Role
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          onLogout();
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-gray-100 flex items-center"
-                      >
-                        <LogOut className="w-4 h-4 mr-3" />
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    setShowNotifications(false);
-                    setShowMobileMenu((prev) => !prev);
-                  }}
-                  className="md:hidden p-2 text-gray-500"
-                >
-                  {showMobileMenu ? <X className="h-6 w-6" /> : <MoreVertical className="h-6 w-6" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {showMobileMenu && (
-            <div className="md:hidden border-t border-gray-200 bg-white">
-              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                {navItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      navigateToTab(item.id);
-                      setShowMobileMenu(false);
-                    }}
-                    className={`w-full text-left flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium ${
-                      activeTab === item.id
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                    }`}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </nav>
+        <CustomerTopNav
+          navRef={navRef}
+          notificationMenuRef={notificationMenuRef}
+          userMenuRef={userMenuRef}
+          landingUrl={landingUrl}
+          omniLogo={omniLogo}
+          navItems={navItems}
+          activeTab={activeTab}
+          navigateToTab={navigateToTab}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          unreadNotificationCount={unreadNotificationCount}
+          visibleNotificationItems={visibleNotificationItems}
+          readNotificationIds={readNotificationIds}
+          onNotificationClick={handleNotificationClick}
+          onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+          onClearNotifications={handleClearNotifications}
+          showUserMenu={showUserMenu}
+          setShowUserMenu={setShowUserMenu}
+          showMobileMenu={showMobileMenu}
+          setShowMobileMenu={setShowMobileMenu}
+          onOpenRoleSwitch={() => {
+            setRoleSwitchStatus({ loading: false, error: "" });
+            setShowRoleSwitchModal(true);
+          }}
+          onLogout={onLogout}
+          userName={userName}
+        />
 
         <main className="px-4 py-6 sm:px-6 sm:py-8">
           <div className="max-w-7xl mx-auto">
-            <Suspense fallback={<PageLoader />}>{renderActivePage()}</Suspense>
+            <Suspense fallback={<PageLoaderCard />}>{renderActivePage()}</Suspense>
           </div>
         </main>
 
-        {showRoleSwitchModal && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto backdrop-blur-md p-4 sm:items-center">
-            <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Switch Role</h3>
-              <p className="text-gray-600 text-center mb-6">Choose the role you want to switch to</p>
-
-              <div className="space-y-4">
-                <button
-                  onClick={() => handleRoleSwitch('broker')}
-                  disabled={roleSwitchStatus.loading}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors text-left"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Briefcase className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Switch to Broker</h4>
-                      <p className="text-sm text-gray-600">Manage a network of professionals</p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleRoleSwitch('worker')}
-                  disabled={roleSwitchStatus.loading}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors text-left"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Wrench className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Switch to Worker</h4>
-                      <p className="text-sm text-gray-600">Accept and complete service jobs</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {roleSwitchStatus.error && <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{roleSwitchStatus.error}</p>}
-
-              <div className="mt-6">
-                <button
-                  onClick={() => {
-                    setRoleSwitchStatus({ loading: false, error: '' });
-                    setShowRoleSwitchModal(false);
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <CustomerRoleSwitchModal
+          open={showRoleSwitchModal}
+          status={roleSwitchStatus}
+          onRoleSwitch={handleRoleSwitch}
+          onClose={() => {
+            setRoleSwitchStatus({ loading: false, error: "" });
+            setShowRoleSwitchModal(false);
+          }}
+        />
       </div>
     </>
   );

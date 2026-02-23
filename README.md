@@ -26,7 +26,8 @@ This README covers complete local setup from clone to first run, including envir
 14. [Troubleshooting](#troubleshooting)
 15. [Security Notes](#security-notes)
 16. [Root Scripts](#root-scripts)
-17. [License and Usage](#license-and-usage)
+17. [Today's Final Update (February 23, 2026)](#todays-final-update-february-23-2026)
+18. [License and Usage](#license-and-usage)
 
 ## What This Project Includes
 
@@ -328,7 +329,9 @@ This runs `build` for all workspaces where the script exists.
   - Password reset success email.
   - Account deletion confirmation email.
 - Role apps verify token using `GET /api/auth/me`.
-- Session is stored in localStorage per role app.
+- Session persistence is role-local and now supports `Remember me`:
+  - checked: token in `localStorage` (persists across browser restarts)
+  - unchecked: token in `sessionStorage` (clears when tab/window closes)
 
 ### 3) Cross-Role Navigation
 
@@ -360,6 +363,7 @@ This runs `build` for all workspaces where the script exists.
 - Quick menus (notification/profile/mobile-nav) auto-collapse on outside click/tap, `Escape`, resize, blur, route changes, and real scroll movement.
 - Scroll auto-collapse includes a small mobile jitter guard so menus still open reliably at any scroll position.
 - Modal overlays use blur backgrounds (`backdrop-blur`) across auth/role-switch flows.
+- Customer booking includes a blurred map-picker modal with map search, current location, draggable pin selection, and manual location text fallback.
 - Mobile inner pages use `ArrowLeft + Back`; navigation goes to previous route when available, with dashboard fallback.
 - Browser tab icon (favicon) uses the Omni logo in landing + all role apps.
 
@@ -494,6 +498,49 @@ From `package.json`:
 - `npm run dev:broker`
 - `npm run dev:worker`
 - `npm run build`
+
+## Today's Final Update (February 23, 2026)
+
+### Structure and complexity cleanup
+
+- Split oversized backend helper file into focused modules:
+  - `backend/src/routes/helpers/constants.js`
+  - `backend/src/routes/helpers/common.js`
+  - `backend/src/routes/helpers/auth.js`
+  - `backend/src/routes/helpers/broker.js`
+  - `backend/src/routes/helpers/booking.js`
+  - `backend/src/routes/helpers/worker.js`
+  - `backend/src/routes/helpers.js` now acts as a barrel export.
+- Split customer booking endpoints into sub-routers:
+  - `backend/src/routes/customer/booking/createRoutes.js`
+  - `backend/src/routes/customer/booking/lifecycleRoutes.js`
+  - `backend/src/routes/customer/booking/settlementRoutes.js`
+  - `backend/src/routes/customer/booking/index.js`
+- Split auth account endpoints into sub-routers:
+  - `backend/src/routes/auth/account/updatePasswordRoutes.js`
+  - `backend/src/routes/auth/account/deleteAccountRoutes.js`
+  - `backend/src/routes/auth/account/logoutRoutes.js`
+  - `backend/src/routes/auth/account/index.js`
+- Removed hardcoded default booking location in backend model (`Dehradun` -> empty string) to match current UI behavior.
+
+### Validation completed today
+
+- Monorepo production builds passed:
+  - `npm run build` (landing + customer + broker + worker)
+- Backend code validation passed:
+  - syntax check on all backend source files (`node --check`)
+  - runtime import smoke check (`import('./src/app.js')`)
+
+### Deployment reachability check
+
+- HTTP health/reachability checks returned `200` for:
+  - `https://omni-backend-4t7s.onrender.com/`
+  - `https://omni-backend-4t7s.onrender.com/api/health`
+  - `https://omni-landing-page.onrender.com/`
+  - `https://omni-customer.onrender.com/`
+  - `https://omni-broker.onrender.com/`
+  - `https://omni-worker.onrender.com/`
+- Note: this confirms services are reachable, but does not replace full production user-flow QA.
 
 ## License and Usage
 

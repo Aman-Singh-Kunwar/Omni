@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Copy, Share2, X } from "lucide-react";
 import api from "../../api";
+import { useAutoDismissValue } from "@shared/hooks/useAutoDismissNotice";
 
 function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {} }) {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {} }) {
   const [workers, setWorkers] = useState([]);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState("idle");
+  useAutoDismissValue(error, () => setError(""));
 
   const totalWorkers = workers.length || Number(stats.totalWorkers || 0);
   const activeBookings = Number(stats.activeBookings || 0);

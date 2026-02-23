@@ -3,7 +3,9 @@
 ## Shared UX + Platform Features
 - Role-based monorepo with 4 frontends: landing, customer, worker, broker.
 - Token handoff flow (`?authToken=...`) from landing to role apps with `/auth/me` validation.
-- Per-role local session persistence (`customer`, `worker`, `broker`) with logout cleanup.
+- Per-role session persistence (`customer`, `worker`, `broker`) with `Remember me` support:
+  - checked: persistent login (`localStorage`)
+  - unchecked: session login (`sessionStorage`, clears on tab/window close)
 - Guest preview mode with auto-redirect to login when interactive actions are clicked.
 - Quick-menu auto-close for notifications, profile menu, and mobile 3-dot navbar menu.
 - Auto-close triggers include outside click/tap, scroll, resize, window blur, `Escape`, and route change.
@@ -21,7 +23,8 @@
 - URL role query support (`?role=customer|worker|broker`) with role-aware routing.
 - Dynamic frontend URL config fetched from backend `/api/config` with local fallbacks.
 - Shared multi-role auth page with mobile role rail and slide-in role panel.
-- Login/signup forms with show/hide password and signup confirm-password.
+- Login/signup forms with eye-based show/hide password and signup confirm-password.
+- Login/signup forms include `Remember me` option for persistent or session-only auth.
 - API-based authentication against backend `/auth/login` and `/auth/signup`.
 - Successful auth redirects users to selected role app with auth token.
 - Responsive marketing sections, FAQ accordion with plus-toggle icon, and footer contact blocks.
@@ -36,12 +39,18 @@
 - Booking form supports service-based auto assignment and worker-based direct booking.
 - Booking receipt preview supports discount toggle (total, discount, final amount).
 - Booking form captures date, 12-hour time (hour/minute/AM-PM), location, and description.
+- Booking location includes manual text entry plus map-picker modal with:
+  - blur backdrop over full page (including navbar)
+  - map search field and pin selection
+  - current location shortcut
+  - street/satellite style switch
+  - map wheel zoom only while hovering the map area
 - Booking lifecycle actions: create, cancel (10-minute window), pay, mark not-provided, review/edit, delete.
 - Booking cards show status badges and worker contact details when available.
 - Customer notifications for booking confirm, payment done, and feedback updates.
 - Notification click marks read and routes user to relevant tab/page.
 - Profile editor for name, email, phone, gender, DOB, bio.
-- Profile save button is disabled until data changes; success banner auto-hides after 5 seconds.
+- Profile save button is disabled until data changes; status banners auto-hide after 5 seconds.
 - Phone validation enforced in profile UI: digits only, length 10-13.
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
@@ -59,7 +68,7 @@
 - Notification click routes to Job Requests, Earnings, or Overview and marks notification read.
 - Profile editor includes name, email, phone, gender, DOB, bio, services, availability, and broker linkage details.
 - Worker profile broker code is read-only after signup.
-- Profile save button is disabled until data changes; success banner auto-hides after 5 seconds.
+- Profile save button is disabled until data changes; status banners auto-hide after 5 seconds.
 - Phone validation enforced in profile UI: digits only, length 10-13.
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
@@ -77,15 +86,23 @@
 - Broker profile includes read-only broker code plus share popup with blur backdrop, copy icon, rules, and stats.
 - Workers page includes matching share-code popup flow (mobile and desktop variants).
 - Mobile workers header uses right-side 2-row controls: Back (top) and Share (bottom).
-- Profile save button is disabled until data changes; success banner auto-hides after 5 seconds.
+- Profile save button is disabled until data changes; status banners auto-hide after 5 seconds.
 - Phone validation enforced in profile UI: digits only, length 10-13.
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
 
 ## Backend Features Supporting Frontends
 - Modular route structure (`auth`, `profile`, `customer`, `worker`, `broker`, `catalog`, `health`).
-- Auth split routers: `publicRoutes`, `roleRoutes`, `accountRoutes`.
+- Auth routes split into grouped modules:
+  - `auth/public/*` (signup/password/session public flows)
+  - `auth/roleRoutes.js`
+  - `auth/account/*` (update-password/delete-account/logout)
 - Profile split routers: `readRoutes`, `updateRoutes`, `notificationRoutes`.
+- Customer booking routes split into sub-routers:
+  - `customer/booking/createRoutes.js`
+  - `customer/booking/lifecycleRoutes.js`
+  - `customer/booking/settlementRoutes.js`
+- Shared backend route helpers split into dedicated modules (`helpers/auth`, `helpers/broker`, `helpers/booking`, `helpers/worker`) with barrel export.
 - Gmail-only account policy for signup and profile email updates.
 - Role-specific signup/login and role switch flow using JWT.
 - Socket.IO server with authenticated connections and role/user rooms.
@@ -109,3 +126,4 @@
 - OTP expiry windows configurable via env.
 - Professional email templates for verification, welcome, reset, and account deletion.
 - Root API endpoints (`/` and `/api`) return browser-friendly HTML and JSON for API clients.
+- Booking model default location is now empty (no hardcoded city fallback).

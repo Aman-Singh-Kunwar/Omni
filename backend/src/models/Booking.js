@@ -95,7 +95,7 @@ const bookingSchema = new mongoose.Schema(
     brokerName: { type: String, default: "Omni Broker", trim: true },
     brokerCommissionRate: { type: Number, min: 0, max: 100, default: DEFAULT_BROKER_COMMISSION_RATE },
     brokerCommissionAmount: { type: Number, min: 0, default: 0 },
-    location: { type: String, default: "Dehradun", trim: true },
+    location: { type: String, default: "", trim: true },
     description: { type: String, default: "", trim: true, maxlength: 500 },
     date: { type: String, required: true },
     time: { type: String, required: true },

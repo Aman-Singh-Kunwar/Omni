@@ -1,11 +1,11 @@
 import express from "express";
-import authRoutes from "./auth.js";
-import brokerRoutes from "./broker.js";
+import authRoutes from "./auth/index.js";
+import brokerRoutes from "./broker/index.js";
 import catalogRoutes from "./catalog.js";
-import customerRoutes from "./customer.js";
+import customerRoutes from "./customer/index.js";
 import healthRoutes from "./health.js";
-import profileRoutes from "./profile.js";
-import workerRoutes from "./worker.js";
+import profileRoutes from "./profile/index.js";
+import workerRoutes from "./worker/index.js";
 const router = express.Router();
 
 router.use(healthRoutes);

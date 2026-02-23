@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Eye, EyeOff, X } from "lucide-react";
 import omniLogo from "../assets/images/omni-logo.png";
 import { roleList, roleMeta } from "../constants/roles";
+import { useAutoDismissStatus } from "@shared/hooks/useAutoDismissNotice";
+import ForgotPasswordModal from "./auth/ForgotPasswordModal";
 
 function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }) {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [status, setStatus] = useState({ loading: false, error: "", info: "" });
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState("request");
@@ -41,6 +44,15 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
   const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, edgeStart: false });
+  const MOBILE_ROLE_EDGE_TRIGGER_WIDTH = 28;
+  useAutoDismissStatus(status, setStatus);
+  useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
+
+  useEffect(() => {
+    setStatus({ loading: false, error: "", info: "" });
+    setForgotPasswordStatus({ loading: false, error: "", info: "" });
+    setForgotPasswordOpen(false);
+  }, [mode]);
 
   useEffect(() => {
     setSelectedRole(roleFromUrl);
@@ -80,13 +92,16 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
-  const redirectToRoleApp = (user, token) => {
+  const redirectToRoleApp = (user, token, shouldRemember = rememberMe) => {
     const resolvedRole = user?.role || verification.role || selectedRole;
     const target = getRoleUrl(resolvedRole);
     if (!target || !token) {
       throw new Error("Unable to continue login.");
     }
-    window.location.href = `${target}/?authToken=${encodeURIComponent(token)}`;
+    const url = new URL(target);
+    url.searchParams.set("authToken", token);
+    url.searchParams.set("remember", shouldRemember ? "1" : "0");
+    window.location.href = url.toString();
   };
 
   const submitSignupRequest = async () => {
@@ -121,7 +136,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
       return;
     }
 
-    redirectToRoleApp(data.user, data.token);
+    redirectToRoleApp(data.user, data.token, rememberMe);
   };
 
   const submitSignupVerification = async () => {
@@ -147,7 +162,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
       throw new Error(data.message || "Verification failed.");
     }
 
-    redirectToRoleApp(data.user, data.token);
+    redirectToRoleApp(data.user, data.token, rememberMe);
   };
 
   const resendVerificationCode = async () => {
@@ -306,7 +321,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
         throw new Error(data.message || "Authentication failed.");
       }
 
-      redirectToRoleApp(data.user, data.token);
+      redirectToRoleApp(data.user, data.token, rememberMe);
     } catch (error) {
       setStatus({ loading: false, error: error.message, info: "" });
     }
@@ -328,17 +343,16 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     mobileRoleSwipeRef.current = {
       startX: touch.clientX,
       startY: touch.clientY,
-      edgeStart: touch.clientX >= viewportWidth - 120
+      edgeStart: touch.clientX >= viewportWidth - MOBILE_ROLE_EDGE_TRIGGER_WIDTH
     };
   };
 
-  const handleMobileSwipeEnd = (event) => {
+  const tryOpenRolePanelFromEdgeGesture = (touch) => {
     if (mobileRolePanelOpen || verification.pending) {
       return;
     }
 
     const start = mobileRoleSwipeRef.current;
-    const touch = event.changedTouches?.[0];
     if (!touch || !start.edgeStart) {
       return;
     }
@@ -348,15 +362,35 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
 
-    if (absX < 45 || absY > absX) {
+    // Require a left swipe from the right edge to avoid accidental opens while vertical scrolling.
+    if (deltaX > -36 || absX < 36 || absY > absX) {
       return;
     }
 
     setMobileRolePanelOpen(true);
+    mobileRoleSwipeRef.current = {
+      ...start,
+      edgeStart: false
+    };
+  };
+
+  const handleMobileSwipeMove = (event) => {
+    const touch = event.touches?.[0];
+    tryOpenRolePanelFromEdgeGesture(touch);
+  };
+
+  const handleMobileSwipeEnd = (event) => {
+    const touch = event.changedTouches?.[0];
+    tryOpenRolePanelFromEdgeGesture(touch);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12" onTouchStart={handleMobileSwipeStart} onTouchEnd={handleMobileSwipeEnd}>
+    <div
+      className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12"
+      onTouchStart={handleMobileSwipeStart}
+      onTouchMove={handleMobileSwipeMove}
+      onTouchEnd={handleMobileSwipeEnd}
+    >
       <div className="mx-auto max-w-5xl">
         <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" />
@@ -402,44 +436,48 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  disabled={mode === "signup" && verification.pending}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter your password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    disabled={mode === "signup" && verification.pending}
+                    onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    disabled={mode === "signup" && verification.pending}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  disabled={mode === "signup" && verification.pending}
-                  onChange={(event) => setShowPassword(event.target.checked)}
-                />
-                Show password
-              </label>
               {mode === "signup" && !verification.pending && (
                 <>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">Confirm Password</label>
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={form.confirmPassword}
-                      onChange={(event) => setForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="Type password again"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={form.confirmPassword}
+                        onChange={(event) => setForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 focus:ring-2 focus:ring-blue-500"
+                        placeholder="Type password again"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-gray-500 hover:text-gray-700"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={showConfirmPassword}
-                      onChange={(event) => setShowConfirmPassword(event.target.checked)}
-                    />
-                    Show confirm password
-                  </label>
                 </>
               )}
               {mode === "signup" && verification.pending && (
@@ -482,6 +520,16 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
                 </>
               )}
             </div>
+
+            <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Remember me
+            </label>
 
             {status.info && <p className="mt-4 rounded bg-emerald-50 p-2 text-sm text-emerald-700">{status.info}</p>}
             {status.error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{status.error}</p>}
@@ -551,7 +599,14 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           mobileRolePanelOpen ? "translate-x-full opacity-0 pointer-events-none" : "translate-x-0 opacity-100"
         }`}
       >
-        <div className="relative h-full w-[102px]">
+        <div className="relative h-full w-[94px]">
+          <button
+            type="button"
+            disabled={verification.pending}
+            onClick={() => setMobileRolePanelOpen(true)}
+            className="pointer-events-auto absolute inset-y-0 right-0 w-7 bg-transparent disabled:cursor-not-allowed ui-no-hover-lift"
+            aria-label="Open role selector from right edge"
+          />
           <div className="pointer-events-none absolute inset-y-3 right-0 w-4 rounded-l-2xl border border-r-0 border-slate-300 bg-gradient-to-b from-white via-slate-100 to-white shadow-[0_0_18px_rgba(15,23,42,0.12)]" />
           <div className="pointer-events-none absolute right-3 top-28 inline-flex h-9 items-center justify-center whitespace-nowrap rounded-l-lg border border-r-0 border-slate-300 bg-white/95 px-3 text-xs font-semibold text-blue-700 shadow-sm">
             {selectedRoleTitle}
@@ -561,7 +616,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
             type="button"
             disabled={verification.pending}
             onClick={() => setMobileRolePanelOpen(true)}
-            className="pointer-events-auto absolute right-0 top-1/2 inline-flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-slate-300 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+            className="pointer-events-auto absolute right-0 top-1/2 inline-flex h-[60px] w-6 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-slate-300 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 ui-no-hover-lift"
             aria-label="Open role selector"
           >
             <ChevronRight className="h-3.5 w-3.5" />
@@ -574,10 +629,10 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           type="button"
           onClick={() => setMobileRolePanelOpen(false)}
           aria-label="Close role selection"
-          className={`absolute inset-0 bg-slate-900/35 transition-opacity duration-300 ${mobileRolePanelOpen ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 bg-slate-900/35 transition-opacity duration-300 ui-modal-overlay ${mobileRolePanelOpen ? "opacity-100" : "opacity-0"}`}
         />
         <aside
-          className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl transition-transform duration-300 ease-out ${
+          className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl transition-transform duration-300 ease-out ui-mobile-drawer ui-touch-scroll ${
             mobileRolePanelOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -596,13 +651,13 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
               <button
                 type="button"
                 onClick={() => setMobileRolePanelOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 ui-touch-target"
                 aria-label="Close role panel"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 ui-touch-scroll">
               <div className="space-y-3">
                 {roleCards.map((role) => {
                   const Icon = role.icon;
@@ -617,7 +672,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
                         updateRoleQuery(role.id);
                         setMobileRolePanelOpen(false);
                       }}
-                      className={`w-full rounded-xl border p-4 text-left transition-all ${
+                      className={`ui-touch-target w-full rounded-xl border p-4 text-left transition-all ${
                         selected ? "border-blue-500 bg-blue-50 shadow-sm ring-1 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-300"
                       } disabled:cursor-not-allowed disabled:opacity-70`}
                     >
@@ -643,118 +698,21 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
         </aside>
       </div>
 
-      {forgotPasswordOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto backdrop-blur-md px-4 py-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-xl">
-            <h2 className="text-xl font-bold text-slate-900">Reset Password</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {forgotPasswordStep === "request"
-                ? "Enter your account email to receive a reset code."
-                : "Enter the code from email and set your new password."}
-            </p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Role: {forgotPasswordRole}</p>
-
-            <div className="mt-4 space-y-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Email</span>
-                <input
-                  type="email"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  value={forgotPasswordForm.email}
-                  disabled={forgotPasswordStep === "verify"}
-                  onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, email: event.target.value }))}
-                />
-              </label>
-
-              {forgotPasswordStep === "verify" && (
-                <>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Verification Code</span>
-                    <input
-                      type="text"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 tracking-[0.3em] focus:ring-2 focus:ring-blue-500"
-                      value={forgotPasswordForm.verificationCode}
-                      onChange={(event) =>
-                        setForgotPasswordForm((prev) => ({
-                          ...prev,
-                          verificationCode: event.target.value.replace(/[^0-9]/g, "").slice(0, 6)
-                        }))
-                      }
-                      placeholder="123456"
-                      maxLength={6}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">New Password</span>
-                    <input
-                      type={showForgotPassword ? "text" : "password"}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      value={forgotPasswordForm.newPassword}
-                      onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={showForgotPassword}
-                      onChange={(event) => setShowForgotPassword(event.target.checked)}
-                    />
-                    Show new password
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Confirm New Password</span>
-                    <input
-                      type={showForgotConfirmPassword ? "text" : "password"}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      value={forgotPasswordForm.confirmNewPassword}
-                      onChange={(event) => setForgotPasswordForm((prev) => ({ ...prev, confirmNewPassword: event.target.value }))}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={showForgotConfirmPassword}
-                      onChange={(event) => setShowForgotConfirmPassword(event.target.checked)}
-                    />
-                    Show confirm password
-                  </label>
-                </>
-              )}
-            </div>
-
-            {forgotPasswordStatus.info && <p className="mt-3 rounded bg-emerald-50 p-2 text-sm text-emerald-700">{forgotPasswordStatus.info}</p>}
-            {forgotPasswordStatus.error && <p className="mt-3 rounded bg-red-50 p-2 text-sm text-red-700">{forgotPasswordStatus.error}</p>}
-
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                onClick={closeForgotPasswordModal}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              {forgotPasswordStep === "verify" && (
-                <button
-                  type="button"
-                  disabled={forgotPasswordStatus.loading}
-                  onClick={submitForgotPasswordRequest}
-                  className="w-full rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-70"
-                >
-                  Resend Code
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={forgotPasswordStatus.loading}
-                onClick={forgotPasswordStep === "request" ? submitForgotPasswordRequest : submitForgotPasswordVerification}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-70"
-              >
-                {forgotPasswordStatus.loading ? "Please wait..." : forgotPasswordStep === "request" ? "Send Code" : "Reset Password"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ForgotPasswordModal
+        open={forgotPasswordOpen}
+        forgotPasswordStep={forgotPasswordStep}
+        forgotPasswordRole={forgotPasswordRole}
+        forgotPasswordForm={forgotPasswordForm}
+        setForgotPasswordForm={setForgotPasswordForm}
+        forgotPasswordStatus={forgotPasswordStatus}
+        showForgotPassword={showForgotPassword}
+        setShowForgotPassword={setShowForgotPassword}
+        showForgotConfirmPassword={showForgotConfirmPassword}
+        setShowForgotConfirmPassword={setShowForgotConfirmPassword}
+        closeForgotPasswordModal={closeForgotPasswordModal}
+        submitForgotPasswordRequest={submitForgotPasswordRequest}
+        submitForgotPasswordVerification={submitForgotPasswordVerification}
+      />
     </div>
   );
 }

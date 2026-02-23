@@ -1,5 +1,6 @@
 import React from "react";
 import ToggleRow from "./ToggleRow";
+import { useAutoDismissStatus } from "../hooks/useAutoDismissNotice";
 
 function NotificationSettingsSection({
   theme,
@@ -12,6 +13,8 @@ function NotificationSettingsSection({
   onSave,
   labels
 }) {
+  useAutoDismissStatus(status, setStatus);
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white/80 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

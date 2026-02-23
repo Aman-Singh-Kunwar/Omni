@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, DollarSign, CheckCircle2, Calendar } from "lucide-react";
 import api from "../../api";
+import { useAutoDismissValue } from "@shared/hooks/useAutoDismissNotice";
 
 function StatCard({ icon: Icon, title, value }) {
   return (
@@ -31,6 +32,7 @@ function BrokerEarningsPage({ authToken, stats, refreshSignal = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [completedBookings, setCompletedBookings] = useState([]);
+  useAutoDismissValue(error, () => setError(""));
 
   useEffect(() => {
     const loadCompletedBookings = async () => {

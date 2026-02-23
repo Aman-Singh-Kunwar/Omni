@@ -8,6 +8,8 @@ const defaultWorkerUrl = import.meta.env.PROD ? "https://omni-worker.onrender.co
 const customerUrl = import.meta.env.VITE_CUSTOMER_APP_URL || defaultCustomerUrl;
 const workerUrl = import.meta.env.VITE_WORKER_APP_URL || defaultWorkerUrl;
 const sessionKey = "omni_broker_session";
+const rememberTruthyValues = new Set(["1", "true", "yes", "on"]);
+const rememberFalsyValues = new Set(["0", "false", "no", "off"]);
 const BrokerDashboard = lazy(() => import("./components/BrokerDashboard"));
 const BrokerAuthPage = lazy(() => import("./components/BrokerAuthPage"));
 
@@ -15,9 +17,20 @@ function RouteLoader() {
   return <div className="flex min-h-screen items-center justify-center bg-emerald-50 text-slate-600">Loading page...</div>;
 }
 
-function getStoredSession() {
+function toSessionPayload(session) {
+  if (!session?.user) {
+    return null;
+  }
+
+  return {
+    user: session.user,
+    token: typeof session.token === "string" ? session.token : ""
+  };
+}
+
+function parseStoredSession(raw) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(sessionKey) || "null");
+    const parsed = JSON.parse(raw || "null");
     if (parsed?.user) {
       return parsed;
     }
@@ -30,18 +43,65 @@ function getStoredSession() {
   }
 }
 
-function storeSession(session) {
-  localStorage.setItem(sessionKey, JSON.stringify(session));
+function getSessionFromStorage(storage) {
+  return parseStoredSession(storage.getItem(sessionKey));
+}
+
+function getStoredSession() {
+  const sessionSession = getSessionFromStorage(window.sessionStorage);
+  if (sessionSession) {
+    return { ...sessionSession, rememberMe: false };
+  }
+
+  const localSession = getSessionFromStorage(window.localStorage);
+  if (localSession) {
+    return { ...localSession, rememberMe: true };
+  }
+
+  return null;
+}
+
+function storeSession(session, rememberMe = false) {
+  const payload = toSessionPayload(session);
+  if (!payload) {
+    return;
+  }
+
+  const targetStorage = rememberMe ? window.localStorage : window.sessionStorage;
+  const secondaryStorage = rememberMe ? window.sessionStorage : window.localStorage;
+  targetStorage.setItem(sessionKey, JSON.stringify(payload));
+  secondaryStorage.removeItem(sessionKey);
 }
 
 function clearSession() {
-  localStorage.removeItem(sessionKey);
+  window.localStorage.removeItem(sessionKey);
+  window.sessionStorage.removeItem(sessionKey);
+}
+
+function parseRememberParam(raw) {
+  if (typeof raw !== "string") {
+    return null;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (rememberTruthyValues.has(normalized)) {
+    return true;
+  }
+  if (rememberFalsyValues.has(normalized)) {
+    return false;
+  }
+
+  return null;
 }
 
 function cleanAuthTokenFromUrl() {
   const url = new URL(window.location.href);
   if (url.searchParams.has("authToken")) {
     url.searchParams.delete("authToken");
+    url.searchParams.delete("remember");
     const suffix = url.searchParams.toString();
     window.history.replaceState({}, "", `${url.pathname}${suffix ? `?${suffix}` : ""}`);
   }
@@ -68,6 +128,8 @@ function App() {
         setChecking(false);
         return;
       }
+      const rememberFromQuery = parseRememberParam(params.get("remember"));
+      const shouldRemember = rememberFromQuery ?? true;
 
       try {
         const response = await api.get("/auth/me", {
@@ -75,8 +137,8 @@ function App() {
         });
         const user = response.data?.user;
         if (user?.role === role) {
-          const nextSession = { user, token: urlToken };
-          storeSession(nextSession);
+          const nextSession = { user, token: urlToken, rememberMe: shouldRemember };
+          storeSession(nextSession, shouldRemember);
           setAuthSession(nextSession);
         } else {
           clearSession();
@@ -115,8 +177,16 @@ function App() {
   };
 
   const handleAuthSuccess = (session) => {
-    storeSession(session);
-    setAuthSession(session);
+    const payload = toSessionPayload(session);
+    if (!payload) {
+      clearSession();
+      setAuthSession(null);
+      return;
+    }
+
+    const shouldRemember = Boolean(session?.rememberMe);
+    storeSession(payload, shouldRemember);
+    setAuthSession({ ...payload, rememberMe: shouldRemember });
   };
 
   const handleLogout = async () => {

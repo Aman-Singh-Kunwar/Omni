@@ -155,7 +155,6 @@ function LandingPage() {
         closeMobileMenu();
       }
     };
-    const handleScroll = () => closeMobileMenu();
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
         closeMobileMenu();
@@ -165,14 +164,12 @@ function LandingPage() {
     document.addEventListener("mousedown", handlePointer);
     document.addEventListener("touchstart", handlePointer);
     document.addEventListener("keydown", handleEscape);
-    window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleResize);
 
     return () => {
       document.removeEventListener("mousedown", handlePointer);
       document.removeEventListener("touchstart", handlePointer);
       document.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
     };
   }, [closeMobileMenu, showMobileMenu]);
@@ -262,7 +259,7 @@ function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setShowMobileMenu((prev) => !prev)}
-                  className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  className="lg:hidden ui-touch-target inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                   aria-label="Open navigation menu"
                   aria-expanded={showMobileMenu}
                 >
@@ -272,7 +269,7 @@ function LandingPage() {
             </div>
 
             {showMobileMenu && (
-              <div ref={mobileMenuRef} className="lg:hidden border-t border-gray-200 bg-white/95 py-3">
+              <div ref={mobileMenuRef} className="relative z-[60] lg:hidden border-t border-gray-200 bg-white/95 py-3 ui-mobile-nav-enter">
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
@@ -280,7 +277,7 @@ function LandingPage() {
                       scrollToSection("roles");
                       closeMobileMenu();
                     }}
-                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="ui-touch-target w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Roles
                   </button>
@@ -290,7 +287,7 @@ function LandingPage() {
                       scrollToSection("services");
                       closeMobileMenu();
                     }}
-                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="ui-touch-target w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Services
                   </button>
@@ -300,7 +297,7 @@ function LandingPage() {
                       scrollToSection("how-it-works");
                       closeMobileMenu();
                     }}
-                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="ui-touch-target w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
                     How it works
                   </button>
@@ -310,7 +307,7 @@ function LandingPage() {
                       scrollToSection("faq");
                       closeMobileMenu();
                     }}
-                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="ui-touch-target w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
                     FAQ
                   </button>
@@ -320,7 +317,7 @@ function LandingPage() {
                       navigate("/login?role=customer");
                       closeMobileMenu();
                     }}
-                    className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="ui-touch-target mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     Login
                   </button>
@@ -546,7 +543,7 @@ function LandingPage() {
                   <summary className="cursor-pointer list-none font-semibold text-gray-900 flex items-center justify-between gap-4">
                     {item.question}
                     <span className="text-2xl font-semibold leading-none text-gray-500 group-open:hidden">+</span>
-                    <span className="text-2xl font-semibold leading-none text-gray-500 hidden group-open:inline">−</span>
+                    <span className="text-2xl font-semibold leading-none text-gray-500 hidden group-open:inline">-</span>
                   </summary>
                   <p className="mt-3 text-gray-600">{item.answer}</p>
                 </details>

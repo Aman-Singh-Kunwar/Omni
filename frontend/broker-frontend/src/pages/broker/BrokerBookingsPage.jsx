@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import api from "../../api";
+import { useAutoDismissValue } from "@shared/hooks/useAutoDismissNotice";
 
 function BrokerBookingsPage({ authToken, refreshSignal = 0 }) {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ function BrokerBookingsPage({ authToken, refreshSignal = 0 }) {
   const [error, setError] = useState("");
   const [brokerCode, setBrokerCode] = useState("");
   const [bookings, setBookings] = useState([]);
+  useAutoDismissValue(error, () => setError(""));
 
   useEffect(() => {
     const loadBookings = async () => {

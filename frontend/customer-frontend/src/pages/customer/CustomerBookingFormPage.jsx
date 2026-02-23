@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
+import LocationPickerModal from "../../components/LocationPickerModal";
 
 function parseTimeParts(timeValue) {
   const raw = String(timeValue || "").trim();
@@ -72,8 +73,22 @@ function CustomerBookingFormPage({
     isDiscountApplied && selectedServicePrice > 0 ? Math.round(selectedServicePrice * (discountPercent / 100)) : 0;
   const finalBookingAmount = selectedServicePrice > 0 ? Math.max(0, selectedServicePrice - discountAmount) : 0;
   const [timeParts, setTimeParts] = useState(() => parseTimeParts(bookingForm.time));
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const hourOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1)), []);
   const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, i) => String(i)), []);
+  const locationPickerInitialPosition = useMemo(() => {
+    const rawLat = bookingForm.locationLat;
+    const rawLng = bookingForm.locationLng;
+    if (rawLat === "" || rawLat === null || rawLat === undefined || rawLng === "" || rawLng === null || rawLng === undefined) {
+      return null;
+    }
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+    return { lat, lng };
+  }, [bookingForm.locationLat, bookingForm.locationLng]);
 
   useEffect(() => {
     const parsed = parseTimeParts(bookingForm.time);
@@ -247,12 +262,31 @@ function CustomerBookingFormPage({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Location</label>
-          <input
-            type="text"
-            value={bookingForm.location}
-            onChange={(event) => setBookingForm((prev) => ({ ...prev, location: event.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={bookingForm.location}
+              onChange={(event) =>
+                setBookingForm((prev) => ({
+                  ...prev,
+                  location: event.target.value,
+                  locationLat: "",
+                  locationLng: ""
+                }))
+              }
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+              placeholder="Enter location or select from map"
+            />
+            <button
+              type="button"
+              onClick={() => setLocationPickerOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              <MapPin className="h-4 w-4" />
+              Select on Map
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">Tap location to open map picker with pin and current location.</p>
         </div>
 
         <div>
@@ -286,6 +320,23 @@ function CustomerBookingFormPage({
           {bookingStatus.loading ? "Booking..." : bookingSource === "worker" ? "Book Worker" : "Book Service"}
         </button>
       </div>
+
+      <LocationPickerModal
+        open={locationPickerOpen}
+        initialLabel={bookingForm.location}
+        initialPosition={locationPickerInitialPosition}
+        initialSearchText={locationPickerInitialPosition ? "" : bookingForm.location}
+        onClose={() => setLocationPickerOpen(false)}
+        onConfirm={({ location, lat, lng }) => {
+          setBookingForm((prev) => ({
+            ...prev,
+            location,
+            locationLat: lat,
+            locationLng: lng
+          }));
+          setLocationPickerOpen(false);
+        }}
+      />
     </div>
   );
 }
