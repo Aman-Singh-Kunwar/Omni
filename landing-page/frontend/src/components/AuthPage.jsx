@@ -44,6 +44,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
   const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, active: false, opened: false });
+  const mobilePanelCloseSwipeRef = useRef({ startX: 0, startY: 0, active: false, closed: false });
   useAutoDismissStatus(status, setStatus);
   useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
 
@@ -394,6 +395,61 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     mobileRoleSwipeRef.current = { startX: 0, startY: 0, active: false, opened: false };
   };
 
+  const handlePanelSwipeStart = (event) => {
+    if (!mobileRolePanelOpen) {
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) {
+      return;
+    }
+
+    mobilePanelCloseSwipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      active: true,
+      closed: false
+    };
+  };
+
+  const handlePanelSwipeMove = (event) => {
+    const start = mobilePanelCloseSwipeRef.current;
+    if (!start.active || start.closed) {
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) {
+      return;
+    }
+
+    const deltaX = touch.clientX - start.startX;
+    const deltaY = touch.clientY - start.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    // Ignore tiny drags and cancel on vertical scroll gestures.
+    if (absY > 18 && absY > absX) {
+      mobilePanelCloseSwipeRef.current = { ...start, active: false };
+      return;
+    }
+
+    if (absX < 20) {
+      return;
+    }
+
+    // Close only for an intentional right swipe inside the panel.
+    if (deltaX >= 28 && absY < absX * 0.8) {
+      mobilePanelCloseSwipeRef.current = { ...start, active: false, closed: true };
+      setMobileRolePanelOpen(false);
+    }
+  };
+
+  const handlePanelSwipeEnd = () => {
+    mobilePanelCloseSwipeRef.current = { startX: 0, startY: 0, active: false, closed: false };
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
       <div className="mx-auto max-w-5xl">
@@ -647,6 +703,10 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           className={`absolute inset-0 bg-slate-900/35 transition-opacity duration-300 ui-modal-overlay ${mobileRolePanelOpen ? "opacity-100" : "opacity-0"}`}
         />
         <aside
+          onTouchStart={handlePanelSwipeStart}
+          onTouchMove={handlePanelSwipeMove}
+          onTouchEnd={handlePanelSwipeEnd}
+          onTouchCancel={handlePanelSwipeEnd}
           className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl transition-transform duration-300 ease-out ui-mobile-drawer ui-touch-scroll ${
             mobileRolePanelOpen ? "translate-x-0" : "translate-x-full"
           }`}
