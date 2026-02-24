@@ -534,6 +534,10 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
               (booking.status || 'pending') === 'pending' ? '' : booking.worker?.email || booking.workerEmail || '',
             workerPhone:
               (booking.status || 'pending') === 'pending' ? '' : booking.worker?.phone || booking.workerPhone || '',
+            workerId: booking.workerId ? String(booking.workerId) : '',
+            workerName: (booking.status || 'pending') !== 'pending' ? (booking.worker?.name || booking.workerName || '') : '',
+            locationLat: typeof booking.locationLat === 'number' ? booking.locationLat : null,
+            locationLng: typeof booking.locationLng === 'number' ? booking.locationLng : null,
             date: booking.date || '',
             time: booking.time || '',
             rating: typeof booking.rating === 'number' ? booking.rating : null,
@@ -825,6 +829,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           date: bookingForm.date,
           time: bookingForm.time,
           location: bookingForm.location,
+          locationLat: Number.isFinite(Number(bookingForm.locationLat)) ? Number(bookingForm.locationLat) : null,
+          locationLng: Number.isFinite(Number(bookingForm.locationLng)) ? Number(bookingForm.locationLng) : null,
           description: bookingForm.description,
           applyDiscount: bookingForm.applyDiscount !== false,
           amount: Number(bookedServiceMeta?.price || 0) > 0 ? Number(bookedServiceMeta.price) : getRandomServicePrice(selectedServiceName)
@@ -1192,6 +1198,8 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           onSubmitReview={handleSubmitReview}
           reviewLoadingBookingId={reviewStatus.loadingBookingId}
           reviewError={reviewStatus.error}
+          authToken={authToken}
+          userName={userName}
         />
       );
     }

@@ -31,6 +31,24 @@ router.get("/broker/bookings", async (req, res, next) => {
       status: "completed",
       $and: [{ $or: brokerScopeFilters }, { $or: workerScopeFilters }]
     })
+      .select({
+        _id: 1,
+        customerName: 1,
+        workerName: 1,
+        service: 1,
+        date: 1,
+        time: 1,
+        rating: 1,
+        status: 1,
+        amount: 1,
+        originalAmount: 1,
+        discountAmount: 1,
+        brokerCommissionAmount: 1,
+        brokerCommissionRate: 1,
+        brokerCode: 1,
+        brokerId: 1,
+        brokerName: 1
+      })
       .sort({ updatedAt: -1, createdAt: -1 })
       .lean();
 

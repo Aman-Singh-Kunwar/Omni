@@ -14,8 +14,10 @@ router.get("/profile", requireAuth, async (req, res, next) => {
     res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
     const payload = toProfileDto(req.authUser);
     if (req.authUser.role === "worker") {
-      const enrichedProfile = await enrichWorkerProfile(req.authUser, payload.profile);
-      const progress = await getWorkerBrokerCommissionProgress(req.authUser);
+      const [enrichedProfile, progress] = await Promise.all([
+        enrichWorkerProfile(req.authUser, payload.profile),
+        getWorkerBrokerCommissionProgress(req.authUser)
+      ]);
       payload.profile = {
         ...enrichedProfile,
         brokerCommissionJobsUsed: progress.usedJobs,

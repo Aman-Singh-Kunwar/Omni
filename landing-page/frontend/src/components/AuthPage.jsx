@@ -43,10 +43,15 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [mobileRolePanelOpen, setMobileRolePanelOpen] = useState(false);
+  const [panelReady, setPanelReady] = useState(false);
   const mobileRoleSwipeRef = useRef({ startX: 0, startY: 0, active: false, opened: false });
   const mobilePanelCloseSwipeRef = useRef({ startX: 0, startY: 0, active: false, closed: false });
   useAutoDismissStatus(status, setStatus);
   useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
+
+  // Suppress transition on first render to prevent the panel from animating
+  // in then out during the initial paint when mobileRolePanelOpen is false.
+  useEffect(() => { setPanelReady(true); }, []);
 
   useEffect(() => {
     setStatus({ loading: false, error: "", info: "" });
@@ -707,7 +712,7 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
           onTouchMove={handlePanelSwipeMove}
           onTouchEnd={handlePanelSwipeEnd}
           onTouchCancel={handlePanelSwipeEnd}
-          className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl transition-transform duration-300 ease-out ui-mobile-drawer ui-touch-scroll ${
+          className={`absolute inset-y-0 right-0 w-[92vw] max-w-sm rounded-l-3xl border-l border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-2xl ui-mobile-drawer ui-touch-scroll ${panelReady ? "transition-transform duration-300 ease-out" : ""} ${
             mobileRolePanelOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >

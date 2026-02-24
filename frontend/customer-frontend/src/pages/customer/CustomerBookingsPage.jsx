@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Car, Clock3, CreditCard, Droplets, Home, Mail, Paintbrush, Phone, Scissors, Trash2, Wind, Wrench, Zap } from "lucide-react";
+import { ArrowLeft, Car, Clock3, CreditCard, Droplets, Home, Mail, MessageCircle, Navigation, Paintbrush, Phone, Scissors, Trash2, Wind, Wrench, Zap } from "lucide-react";
+import LiveTrackingModal from "../../components/LiveTrackingModal";
+import ChatModal from "@shared/components/ChatModal";
 
 const CANCEL_WINDOW_MS = 10 * 60 * 1000;
 const cancelEligibleStatuses = new Set(["pending", "confirmed", "upcoming"]);
 const reviewEligibleStatuses = new Set(["confirmed", "in-progress", "completed", "not-provided"]);
+const trackEligibleStatuses = new Set(["confirmed", "in-progress", "upcoming"]);
+const chatEligibleStatuses = new Set(["confirmed", "in-progress", "upcoming"]);
 const SERVICE_VISUALS = [
   { tokens: ["plumber", "plumbing"], icon: Droplets, containerClass: "bg-blue-100", iconClass: "text-blue-600" },
   { tokens: ["electrician", "electrical"], icon: Zap, containerClass: "bg-yellow-100", iconClass: "text-yellow-600" },
@@ -61,9 +65,13 @@ function CustomerBookingsPage({
   deleteLoadingBookingId = "",
   deleteError = "",
   reviewLoadingBookingId = "",
-  reviewError = ""
+  reviewError = "",
+  authToken = "",
+  userName = ""
 }) {
   const navigate = useNavigate();
+  const [trackingBooking, setTrackingBooking] = useState(null);
+  const [chatBooking, setChatBooking] = useState(null);
   const handleBackClick = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -104,6 +112,7 @@ function CustomerBookingsPage({
   }, [recentBookings]);
 
   return (
+    <>
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
       <div className="mb-6 flex items-center justify-between gap-3">
         <h3 className="text-xl font-bold text-gray-900">My Bookings</h3>
@@ -160,6 +169,30 @@ function CustomerBookingsPage({
               </div>
               <div className="w-full sm:w-auto text-left sm:text-right">
                 {booking.rating && <div className="mt-2 flex items-center sm:hidden">{renderStars(booking.rating)}</div>}
+                {(trackEligibleStatuses.has(booking.status) || chatEligibleStatuses.has(booking.status)) && booking.workerId && (
+                  <div className="mt-2 flex justify-between gap-2 sm:hidden w-full">
+                    {trackEligibleStatuses.has(booking.status) && (
+                      <button
+                        type="button"
+                        onClick={() => setTrackingBooking(booking)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 whitespace-nowrap"
+                      >
+                        <Navigation className="h-3.5 w-3.5 flex-shrink-0" />
+                        Track Worker
+                      </button>
+                    )}
+                    {chatEligibleStatuses.has(booking.status) && (
+                      <button
+                        type="button"
+                        onClick={() => setChatBooking(booking)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Chat
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div
                   className={`mt-2 flex items-center sm:hidden ${reviewEligibleStatuses.has(booking.status) ? "justify-between" : "justify-end"}`}
                 >
@@ -210,6 +243,26 @@ function CustomerBookingsPage({
                   <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(booking.status)}`}>
                     {formatStatusLabel(booking.status)}
                   </span>
+                  {trackEligibleStatuses.has(booking.status) && booking.workerId && (
+                    <button
+                      type="button"
+                      onClick={() => setTrackingBooking(booking)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 whitespace-nowrap"
+                    >
+                      <Navigation className="h-3.5 w-3.5 flex-shrink-0" />
+                      Track Worker
+                    </button>
+                  )}
+                  {chatEligibleStatuses.has(booking.status) && booking.workerId && (
+                    <button
+                      type="button"
+                      onClick={() => setChatBooking(booking)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Chat
+                    </button>
+                  )}
                   {booking.rating && <div className="flex items-center">{renderStars(booking.rating)}</div>}
                   {reviewEligibleStatuses.has(booking.status) && (
                     <button
@@ -357,6 +410,24 @@ function CustomerBookingsPage({
         {recentBookings.length === 0 && <p className="text-sm text-gray-500">No bookings found for this account.</p>}
       </div>
     </div>
+
+    <ChatModal
+      open={chatBooking != null}
+      onClose={() => setChatBooking(null)}
+      bookingId={chatBooking?.id}
+      senderName={userName}
+      senderRole="customer"
+      counterpartName={chatBooking?.provider}
+      authToken={authToken}
+      bookingStatus={chatBooking?.status}
+    />
+    <LiveTrackingModal
+      open={trackingBooking != null}
+      onClose={() => setTrackingBooking(null)}
+      booking={trackingBooking}
+      authToken={authToken}
+    />
+    </>
   );
 }
 

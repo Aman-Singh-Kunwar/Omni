@@ -43,7 +43,7 @@ router.get("/broker/dashboard", async (req, res, next) => {
 
     await expireTimedOutPendingBookings(bookingsQuery);
 
-    const bookings = await Booking.find(bookingsQuery).sort({ createdAt: -1 }).lean();
+    const bookings = await Booking.find(bookingsQuery).select({ chatMessages: 0 }).sort({ createdAt: -1 }).lean();
     const workerIdSet = new Set(workerIds.map((value) => String(value)));
     const workerNameSet = new Set(workerNames.map((value) => normalizeForCompare(value)));
     const workerEmailSet = new Set(workerEmails.map((value) => normalizeForCompare(value)));

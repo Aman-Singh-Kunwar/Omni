@@ -68,8 +68,8 @@ function CustomerHomePage({
   const visibleServices = isMobileView && !normalizedQuery ? filteredServices.slice(0, visibleServicesCount) : filteredServices;
   const hasMoreServices = isMobileView && !normalizedQuery && filteredServices.length > visibleServicesCount;
   const workerBatchSize = isMobileView ? MOBILE_WORKERS_BATCH_SIZE : DEFAULT_WORKERS_BATCH_SIZE;
-  const visibleProviders = isMobileView && !normalizedQuery ? filteredProviders.slice(0, visibleProvidersCount) : filteredProviders;
-  const hasMoreProviders = isMobileView && !normalizedQuery && filteredProviders.length > visibleProvidersCount;
+  const visibleProviders = !normalizedQuery ? filteredProviders.slice(0, visibleProvidersCount) : filteredProviders;
+  const hasMoreProviders = !normalizedQuery && filteredProviders.length > visibleProvidersCount;
 
   return (
     <>

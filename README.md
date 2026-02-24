@@ -26,8 +26,7 @@ This README covers complete local setup from clone to first run, including envir
 14. [Troubleshooting](#troubleshooting)
 15. [Security Notes](#security-notes)
 16. [Root Scripts](#root-scripts)
-17. [Today's Final Update (February 23, 2026)](#todays-final-update-february-23-2026)
-18. [License and Usage](#license-and-usage)
+17. [License and Usage](#license-and-usage)
 
 ## What This Project Includes
 
@@ -63,6 +62,7 @@ Short feature list by frontend is available in:
 - Tailwind CSS
 - Axios (role-based frontends)
 - Socket.IO client (`socket.io-client`)
+- Leaflet + react-leaflet (interactive maps in booking and live tracking flows)
 - Lucide React icons
 
 ### Monorepo Tooling
@@ -91,6 +91,17 @@ Omni/
       .env
 
   frontend/
+    shared/
+      utils/
+        realtime.js
+        mapUtils.js       ← Haversine, ETA, OSRM + geocoding shared by tracking modals
+        common.js
+        createCachedApiClient.js
+      hooks/
+        useQuickMenuAutoClose.js
+        useAutoDismissNotice.js
+      components/
+      settings/
     customer-frontend/
       src/
       package.json
@@ -343,12 +354,15 @@ This runs `build` for all workspaces where the script exists.
 
 ### 4) Booking Lifecycle (high level)
 
-1. Customer creates booking (`POST /api/bookings`).
+1. Customer creates booking (`POST /api/bookings`) — GPS coordinates captured from map picker (validated server-side: lat −90…90, lng −180…180). If the customer only typed a text address without picking a pin, coordinates are stored as null.
 2. Matching workers see pending requests.
 3. Worker accepts/rejects (`PATCH /api/worker/bookings/:bookingId`).
 4. Customer can cancel within a 10-minute window.
-5. Completed jobs can be paid/reviewed by customer.
-6. Broker commission and worker net values are computed by backend helpers.
+5. Once a booking is confirmed or in-progress:
+   - Worker can open the **Customer Location** modal — sees the customer's exact GPS pin (or a geocoded area circle for text-only addresses) on a Leaflet map and starts sharing their own live GPS via Socket.IO.
+   - Customer can open the **Live Tracking** modal — watches the worker's real-time position on a Leaflet map with road route (OSRM), distance, and ETA. If no GPS pin was stored, the customer's typed address is geocoded via Nominatim with a progressive fallback and shown as an approximate-area circle.
+6. Completed jobs can be paid/reviewed by customer.
+7. Broker commission and worker net values are computed by backend helpers.
 
 ### 5) Broker-Worker Linking
 
@@ -372,8 +386,26 @@ This runs `build` for all workspaces where the script exists.
 - Backend authenticates socket connections using the same JWT token used for API calls.
 - Customer, broker, and worker apps subscribe to booking updates and refresh relevant dashboard data on `booking:changed`.
 - Optional frontend env `VITE_SOCKET_URL` can point directly to socket host; otherwise it is derived from `VITE_API_URL`.
+- **Live worker location sharing:**
+  - Worker emits `join:booking` to enter an authenticated `booking:{id}` room.
+  - Worker emits `worker:location` with `{ bookingId, lat, lng }` — backend validates worker role and coordinate bounds before broadcasting to the booking room.
+  - Customer listens for `worker:location` events and updates the live tracking map in real time.
+  - Road route between worker and customer is fetched from the OSRM routing API and re-fetched at most once every 5 seconds as the worker moves (leading-edge throttle). Each fetch uses an `AbortController` to cancel any in-flight request before starting a new one, preventing stale route responses from overwriting a newer route.
+  - If the booking has no GPS coordinates (customer typed a text address only), both modals geocode the address via Nominatim using a progressive comma-split fallback that rejects results broader than 50 km, then display an approximate-area circle on the map.
 
-### 8) Profile Validation Rules
+### 8) Customer–Worker Real-Time Chat
+
+- Chat is available for bookings in `confirmed`, `in-progress`, or `upcoming` status.
+- Customer opens Chat from My Bookings; worker opens Chat from Schedule — both use the shared `ChatModal` component.
+- **Socket events**: `chat:send` → server persists message + broadcasts `chat:message` to booking room; `chat:read` → broadcasts read receipt; `chat:delete` → removes own messages; `chat:edit` → updates own message text; `chat:presence` → relays online/offline status.
+- Messages persist in MongoDB (`chatMessages` array, capped at 200 per booking); history loaded via `GET /bookings/:bookingId/chat` on modal open.
+- **Delivery ticks**: single gray ✓ = sending, double gray ✓✓ = delivered, double blue ✓✓ = read by the other participant.
+- **Presence**: "Online" / "Offline" shown in chat header — updated in real time when the other side opens or closes the modal.
+- **Select mode**: double-click (desktop) or long-press (mobile) on own message to enter select mode; delete or edit the selection.
+- **Edit mode**: in-place edit with banner + Escape to cancel; `(edited)` label on the bubble after save.
+- Chat input is locked (read-only) when booking status is `completed`, `cancelled`, or `not-provided`.
+
+### 9) Profile Validation Rules
 
 - Phone number is optional, but if provided it must contain digits only and be 10-13 characters long.
 - Gender values currently supported are: `male`, `female`, `prefer_not_to_say`, and `other`.
@@ -417,6 +449,7 @@ Core routes:
   - `PATCH /customer/bookings/:bookingId/not-provided`
   - `PATCH /customer/bookings/:bookingId/pay`
   - `PATCH /customer/bookings/:bookingId/review`
+  - `GET /bookings/:bookingId/chat`
 
 - Broker:
   - `GET /broker/dashboard`
@@ -439,6 +472,8 @@ Core routes:
 
 ### Booking
 - Stores customer, worker, broker linkage, service/time details, pricing, status, rating/feedback.
+- Stores customer GPS coordinates (`locationLat`, `locationLng`) set at booking creation for live tracking use. Coordinates are validated on the server: values outside lat −90…90 or lng −180…180 are stored as null.
+- Stores `chatMessages` array (embedded, no `_id`) with fields `messageId`, `senderId`, `senderName`, `senderRole`, `text`, `edited`, `timestamp`; array is capped at 200 entries per booking.
 - Status values include:
   - `pending`, `confirmed`, `in-progress`, `completed`, `cancelled`, `upcoming`, `failed`, `not-provided`
 
@@ -498,49 +533,6 @@ From `package.json`:
 - `npm run dev:broker`
 - `npm run dev:worker`
 - `npm run build`
-
-## Today's Final Update (February 23, 2026)
-
-### Structure and complexity cleanup
-
-- Split oversized backend helper file into focused modules:
-  - `backend/src/routes/helpers/constants.js`
-  - `backend/src/routes/helpers/common.js`
-  - `backend/src/routes/helpers/auth.js`
-  - `backend/src/routes/helpers/broker.js`
-  - `backend/src/routes/helpers/booking.js`
-  - `backend/src/routes/helpers/worker.js`
-  - `backend/src/routes/helpers.js` now acts as a barrel export.
-- Split customer booking endpoints into sub-routers:
-  - `backend/src/routes/customer/booking/createRoutes.js`
-  - `backend/src/routes/customer/booking/lifecycleRoutes.js`
-  - `backend/src/routes/customer/booking/settlementRoutes.js`
-  - `backend/src/routes/customer/booking/index.js`
-- Split auth account endpoints into sub-routers:
-  - `backend/src/routes/auth/account/updatePasswordRoutes.js`
-  - `backend/src/routes/auth/account/deleteAccountRoutes.js`
-  - `backend/src/routes/auth/account/logoutRoutes.js`
-  - `backend/src/routes/auth/account/index.js`
-- Removed hardcoded default booking location in backend model (`Dehradun` -> empty string) to match current UI behavior.
-
-### Validation completed today
-
-- Monorepo production builds passed:
-  - `npm run build` (landing + customer + broker + worker)
-- Backend code validation passed:
-  - syntax check on all backend source files (`node --check`)
-  - runtime import smoke check (`import('./src/app.js')`)
-
-### Deployment reachability check
-
-- HTTP health/reachability checks returned `200` for:
-  - `https://omni-backend-4t7s.onrender.com/`
-  - `https://omni-backend-4t7s.onrender.com/api/health`
-  - `https://omni-landing-page.onrender.com/`
-  - `https://omni-customer.onrender.com/`
-  - `https://omni-broker.onrender.com/`
-  - `https://omni-worker.onrender.com/`
-- Note: this confirms services are reachable, but does not replace full production user-flow QA.
 
 ## License and Usage
 

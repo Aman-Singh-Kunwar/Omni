@@ -41,6 +41,7 @@ async function getAvailableWorkers(limit = 0) {
     role: "worker",
     $or: [{ "workerProfile.isAvailable": true }, { "workerProfile.isAvailable": { $exists: false } }]
   })
+    .select({ name: 1, email: 1, workerProfile: 1, updatedAt: 1, createdAt: 1 })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();
 
@@ -53,9 +54,13 @@ async function getAvailableWorkers(limit = 0) {
     return [];
   }
 
+  // Limit booking scan to the last 365 days — avoids a full-collection scan
+  // while still capturing all practically relevant completed-job history.
+  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const workerNames = workers.map((worker) => worker.name);
   const bookings = await Booking.find({
-    workerName: { $in: workerNames }
+    workerName: { $in: workerNames },
+    createdAt: { $gte: oneYearAgo }
   })
     .select({ workerName: 1, status: 1, rating: 1 })
     .lean();

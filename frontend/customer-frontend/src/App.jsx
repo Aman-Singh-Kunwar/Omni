@@ -13,8 +13,22 @@ const rememberFalsyValues = new Set(["0", "false", "no", "off"]);
 const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
 const CustomerAuthPage = lazy(() => import("./components/CustomerAuthPage"));
 
+function LoadingScreen({ message }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative h-16 w-16">
+          <div className="h-16 w-16 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" />
+          <img src="/omni-logo.png" alt="Omni" className="absolute inset-0 m-auto h-9 w-9 rounded-full object-contain" />
+        </div>
+        <p className="text-sm font-medium text-slate-500">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 function RouteLoader() {
-  return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">Loading page...</div>;
+  return <LoadingScreen message="Loading page..." />;
 }
 
 function toSessionPayload(session) {
@@ -210,7 +224,7 @@ function App() {
   };
 
   if (checking) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">Checking login...</div>;
+    return <LoadingScreen message="Checking login..." />;
   }
 
   return (

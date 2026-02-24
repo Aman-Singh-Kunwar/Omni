@@ -15,6 +15,20 @@ const defaultConfig = {
   }
 };
 
+function RouteLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative h-16 w-16">
+          <div className="h-16 w-16 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" />
+          <img src="/omni-logo.png" alt="Omni" className="absolute inset-0 m-auto h-9 w-9 rounded-full object-contain" />
+        </div>
+        <p className="text-sm font-medium text-slate-500">Loading page...</p>
+      </div>
+    </div>
+  );
+}
+
 function ScrollToTop() {
   const location = useLocation();
 
@@ -53,7 +67,7 @@ function App() {
   };
 
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">Loading page...</div>}>
+    <Suspense fallback={<RouteLoader />}>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />

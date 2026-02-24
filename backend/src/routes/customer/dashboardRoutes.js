@@ -43,7 +43,7 @@ router.get("/customer/dashboard", async (req, res, next) => {
     const [services, featuredProviders, bookings] = await Promise.all([
       Service.find().sort({ providers: -1 }).lean(),
       getAvailableWorkers(6),
-      Booking.find(customerFilter).sort({ createdAt: -1 }).lean()
+      Booking.find(customerFilter).select({ chatMessages: 0 }).sort({ createdAt: -1 }).lean()
     ]);
 
     const workerIds = [...new Set(bookings.map((booking) => booking.workerId).filter(Boolean).map((value) => String(value)))];

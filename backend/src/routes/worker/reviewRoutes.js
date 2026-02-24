@@ -28,6 +28,7 @@ router.get("/worker/reviews", async (req, res, next) => {
       rating: { $gt: 0 },
       feedback: { $exists: true, $ne: "" }
     })
+      .select({ chatMessages: 0 })
       .sort({ updatedAt: -1, createdAt: -1 })
       .lean();
 

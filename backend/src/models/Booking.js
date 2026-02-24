@@ -96,6 +96,8 @@ const bookingSchema = new mongoose.Schema(
     brokerCommissionRate: { type: Number, min: 0, max: 100, default: DEFAULT_BROKER_COMMISSION_RATE },
     brokerCommissionAmount: { type: Number, min: 0, default: 0 },
     location: { type: String, default: "", trim: true },
+    locationLat: { type: Number, default: null },
+    locationLng: { type: Number, default: null },
     description: { type: String, default: "", trim: true, maxlength: 500 },
     date: { type: String, required: true },
     time: { type: String, required: true },
@@ -111,7 +113,22 @@ const bookingSchema = new mongoose.Schema(
     rating: { type: Number, min: 0, max: 5 },
     feedback: { type: String, default: "", trim: true, maxlength: 500 },
     hiddenForCustomer: { type: Boolean, default: false },
-    hiddenForCustomerAt: { type: Date }
+    hiddenForCustomerAt: { type: Date },
+    chatMessages: {
+      type: [
+        {
+          _id: false,
+          messageId: { type: String, required: true },
+          senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          senderName: { type: String, required: true, trim: true },
+          senderRole: { type: String, enum: ["customer", "worker"], required: true },
+          text: { type: String, required: true, trim: true, maxlength: 1000 },
+          edited: { type: Boolean, default: false },
+          timestamp: { type: Date, default: Date.now }
+        }
+      ],
+      default: []
+    }
   },
   { timestamps: true }
 );

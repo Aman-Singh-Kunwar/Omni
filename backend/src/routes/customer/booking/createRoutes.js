@@ -2,7 +2,7 @@ import express from "express";
 import Booking from "../../../models/Booking.js";
 import User from "../../../models/User.js";
 import { emitBookingRealtimeEvent } from "../../../realtime/bookingEvents.js";
-import { requireAuth, workerProvidesService } from "../../helpers.js";
+import { normalizeForCompare, requireAuth } from "../../helpers.js";
 import { ensureCustomerRole } from "./shared.js";
 
 const router = express.Router();
@@ -22,13 +22,20 @@ router.post("/bookings", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "service, date, and time are required to create a booking." });
     }
 
-    const availableWorkers = await User.find({
+    // Build a case-insensitive regex for the service so MongoDB filters workers
+    // directly — avoids fetching the entire available-worker set into RAM.
+    const normalizedService = normalizeForCompare(service);
+    const serviceRegex = new RegExp(
+      `^${normalizedService.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      "i"
+    );
+    const eligibleWorkers = await User.find({
       role: "worker",
-      $or: [{ "workerProfile.isAvailable": true }, { "workerProfile.isAvailable": { $exists: false } }]
+      $or: [{ "workerProfile.isAvailable": true }, { "workerProfile.isAvailable": { $exists: false } }],
+      "workerProfile.servicesProvided": serviceRegex
     })
       .select({ _id: 1, workerProfile: 1 })
       .lean();
-    const eligibleWorkers = availableWorkers.filter((worker) => workerProvidesService(worker, service));
     if (!eligibleWorkers.length) {
       return res.status(409).json({ message: "No workers are currently available for this service." });
     }
@@ -56,6 +63,8 @@ router.post("/bookings", requireAuth, async (req, res, next) => {
       rejectedByWorkerIds: [],
       brokerName: String(payload.brokerName || "").trim() || "Omni Broker",
       location: String(payload.location || "").trim(),
+      locationLat: (() => { const v = Number(payload.locationLat); return Number.isFinite(v) && v >= -90 && v <= 90 ? v : null; })(),
+      locationLng: (() => { const v = Number(payload.locationLng); return Number.isFinite(v) && v >= -180 && v <= 180 ? v : null; })(),
       description: String(payload.description || "").trim(),
       date,
       time,

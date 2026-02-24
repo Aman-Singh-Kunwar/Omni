@@ -47,8 +47,10 @@ router.patch("/customer/bookings/:bookingId/pay", requireAuth, async (req, res, 
       return res.status(409).json({ message: "Payment is enabled after the 10-minute cancellation window." });
     }
 
-    await ensureBookingBrokerAttribution(booking);
-    const assignedWorker = await findAssignedWorkerForBooking(booking);
+    const [, assignedWorker] = await Promise.all([
+      ensureBookingBrokerAttribution(booking),
+      findAssignedWorkerForBooking(booking)
+    ]);
     const workerHasLinkedBroker = Boolean(
       (assignedWorker?.workerProfile?.brokerId && String(assignedWorker.workerProfile.brokerId).trim()) ||
         safeNormalizeBrokerCode(assignedWorker?.workerProfile?.brokerCode)

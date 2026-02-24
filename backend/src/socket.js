@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import Booking from "./models/Booking.js";
 import User from "./models/User.js";
 import { verifyToken } from "./routes/helpers.js";
 import logger from "./utils/logger.js";
@@ -84,6 +85,7 @@ async function authenticateSocketConnection(socket, next) {
   const user = await User.findById(payload.sub)
     .select({
       _id: 1,
+      name: 1,
       role: 1,
       email: 1,
       workerProfile: 1,
@@ -96,6 +98,7 @@ async function authenticateSocketConnection(socket, next) {
 
   socket.data.authUser = {
     id: String(user._id),
+    name: String(user.name || "").trim(),
     role: String(user.role || ""),
     email: String(user.email || "").trim().toLowerCase(),
     workerProfile: user.workerProfile || {},
@@ -165,6 +168,158 @@ function setupSocketHandlers(io) {
         userId: authUser.id || "",
         role: authUser.role || "",
         reason
+      });
+    });
+
+    socket.on("join:booking", (bookingId) => {
+      const normalizedId = String(bookingId || "").trim();
+      if (normalizedId) {
+        addRoomIfPresent(socket, `booking:${normalizedId}`);
+      }
+    });
+
+    socket.on("worker:location", (data) => {
+      if (!authUser?.id || authUser.role !== "worker") {
+        return;
+      }
+      const bookingId = String(data?.bookingId || "").trim();
+      const lat = Number(data?.lat);
+      const lng = Number(data?.lng);
+      if (!bookingId || !Number.isFinite(lat) || !Number.isFinite(lng) ||
+          lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return;
+      }
+      io.to(`booking:${bookingId}`).emit("worker:location", {
+        bookingId,
+        workerId: authUser.id,
+        lat,
+        lng,
+        updatedAt: new Date().toISOString()
+      });
+    });
+
+    socket.on("chat:send", async (data) => {
+      if (!authUser?.id || !["customer", "worker"].includes(authUser.role)) {
+        return;
+      }
+      const chatBookingId = String(data?.bookingId || "").trim();
+      const text = String(data?.text || "").trim().slice(0, 1000);
+      if (!chatBookingId || !text) {
+        return;
+      }
+
+      try {
+        const booking = await Booking.findById(chatBookingId)
+          .select({ customerId: 1, workerId: 1, status: 1 })
+          .lean();
+        if (!booking) {
+          return;
+        }
+        const chatEligible = new Set(["confirmed", "in-progress", "upcoming"]);
+        if (!chatEligible.has(booking.status)) {
+          return;
+        }
+        const isParticipant =
+          (booking.customerId && String(booking.customerId) === authUser.id) ||
+          (booking.workerId && String(booking.workerId) === authUser.id);
+        if (!isParticipant) {
+          return;
+        }
+
+        const clientMsgId = String(data?.clientMsgId || "").trim().slice(0, 64);
+        const messageId = clientMsgId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const timestamp = new Date();
+        await Booking.updateOne(
+          { _id: chatBookingId },
+          { $push: { chatMessages: { $each: [{ messageId, senderId: authUser.id, senderName: authUser.name || "User", senderRole: authUser.role, text, timestamp }], $slice: -200 } } }
+        );
+
+        io.to(`booking:${chatBookingId}`).emit("chat:message", {
+          bookingId: chatBookingId,
+          messageId,
+          senderName: authUser.name || "User",
+          senderRole: authUser.role,
+          text,
+          timestamp: timestamp.toISOString()
+        });
+      } catch (_error) {
+        // Ignore chat persistence errors — do not crash the socket.
+      }
+    });
+
+    socket.on("chat:read", (data) => {
+      if (!authUser?.id || !["customer", "worker"].includes(authUser.role)) return;
+      const chatBookingId = String(data?.bookingId || "").trim();
+      if (!chatBookingId) return;
+      socket.to(`booking:${chatBookingId}`).emit("chat:read", {
+        bookingId: chatBookingId,
+        readerRole: authUser.role
+      });
+    });
+
+    socket.on("chat:delete", async (data) => {
+      if (!authUser?.id || !["customer", "worker"].includes(authUser.role)) return;
+      const chatBookingId = String(data?.bookingId || "").trim();
+      const rawIds = Array.isArray(data?.messageIds) ? data.messageIds : [];
+      const messageIds = rawIds.map(String).filter(Boolean).slice(0, 50);
+      if (!chatBookingId || !messageIds.length) return;
+      try {
+        const booking = await Booking.findById(chatBookingId)
+          .select({ customerId: 1, workerId: 1 })
+          .lean();
+        if (!booking) return;
+        const isParticipant =
+          (booking.customerId && String(booking.customerId) === authUser.id) ||
+          (booking.workerId && String(booking.workerId) === authUser.id);
+        if (!isParticipant) return;
+        await Booking.updateOne(
+          { _id: chatBookingId },
+          { $pull: { chatMessages: { messageId: { $in: messageIds }, senderId: authUser.id } } }
+        );
+        io.to(`booking:${chatBookingId}`).emit("chat:deleted", { bookingId: chatBookingId, messageIds });
+      } catch (_error) {
+        // Ignore delete errors.
+      }
+    });
+
+    socket.on("chat:edit", async (data) => {
+      if (!authUser?.id || !["customer", "worker"].includes(authUser.role)) return;
+      const chatBookingId = String(data?.bookingId || "").trim();
+      const messageId = String(data?.messageId || "").trim();
+      const newText = String(data?.text || "").trim().slice(0, 1000);
+      if (!chatBookingId || !messageId || !newText) return;
+      try {
+        const booking = await Booking.findById(chatBookingId)
+          .select({ customerId: 1, workerId: 1 })
+          .lean();
+        if (!booking) return;
+        const isParticipant =
+          (booking.customerId && String(booking.customerId) === authUser.id) ||
+          (booking.workerId && String(booking.workerId) === authUser.id);
+        if (!isParticipant) return;
+        const result = await Booking.updateOne(
+          { _id: chatBookingId, chatMessages: { $elemMatch: { messageId, senderId: authUser.id } } },
+          { $set: { "chatMessages.$.text": newText, "chatMessages.$.edited": true } }
+        );
+        if (!result.modifiedCount) return;
+        io.to(`booking:${chatBookingId}`).emit("chat:edited", {
+          bookingId: chatBookingId,
+          messageId,
+          text: newText
+        });
+      } catch (_error) {
+        // Ignore edit errors.
+      }
+    });
+
+    socket.on("chat:presence", (data) => {
+      if (!authUser?.id || !["customer", "worker"].includes(authUser.role)) return;
+      const chatBookingId = String(data?.bookingId || "").trim();
+      if (!chatBookingId) return;
+      socket.to(`booking:${chatBookingId}`).emit("chat:presence", {
+        bookingId: chatBookingId,
+        senderRole: authUser.role,
+        online: Boolean(data?.online)
       });
     });
   });

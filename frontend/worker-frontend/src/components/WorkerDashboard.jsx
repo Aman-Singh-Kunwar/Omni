@@ -250,8 +250,11 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
         ? response.data.scheduleJobs.map((job) => ({
             id: toStableId(job._id || job.id, `${job.customerName}-${job.service}-${job.date}-${job.time}`),
             customer: job.customerName || "Customer",
+            customerName: job.customerName || "Customer",
             service: job.service || "Service",
             location: job.location || "",
+            locationLat: typeof job.locationLat === "number" ? job.locationLat : null,
+            locationLng: typeof job.locationLng === "number" ? job.locationLng : null,
             date: job.date || "",
             time: job.time || "",
             amount: Number(job.amount || 0),
@@ -608,7 +611,7 @@ const WorkerDashboard = ({ onLogout, customerUrl, brokerUrl, userName = "John Wo
     }
 
     if (activeTab === "schedule") {
-      return <WorkerSchedulePage scheduleJobs={scheduleJobs} />;
+      return <WorkerSchedulePage scheduleJobs={scheduleJobs} authToken={authToken} userName={userName} />;
     }
 
     if (activeTab === "earnings") {

@@ -52,6 +52,7 @@ router.get("/worker/dashboard", async (req, res, next) => {
     const bookings = await Booking.find({
       $or: [{ workerId: worker._id }, { workerName: worker.name }, { workerEmail: worker.email }, { status: "pending" }]
     })
+      .select({ chatMessages: 0 })
       .sort({ createdAt: -1 })
       .lean();
 
