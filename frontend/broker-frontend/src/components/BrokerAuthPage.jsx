@@ -231,7 +231,7 @@ function BrokerAuthPage({ mode = "login", onSuccess }) {
       onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
       navigate(redirectPath, { replace: true });
     } catch (error) {
-      setStatus({ loading: false, error: error.response?.data?.message || "Authentication failed.", info: "" });
+      setStatus({ loading: false, error: error.response?.data?.message || (!error.response ? "Unable to reach server. Please try again." : "Authentication failed."), info: "" });
     }
   };
 

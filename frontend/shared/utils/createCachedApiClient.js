@@ -66,7 +66,7 @@ export function createCachedApiClient(apiBase, options = {}) {
   const storage = getStorage();
   const api = axios.create({
     baseURL: apiBase,
-    timeout: 15000
+    timeout: 60000
   });
   const fallbackAdapter = axios.getAdapter(api.defaults.adapter || axios.defaults.adapter);
 
