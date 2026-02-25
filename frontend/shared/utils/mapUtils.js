@@ -18,19 +18,49 @@ export function haversineKm(a, b) {
 }
 
 /**
- * Format a distance in km as a human-readable ETA string (assuming 30 km/h average).
+ * Returns a traffic multiplier based on the current hour of day.
+ * Peak hours (morning/evening rush) get higher multipliers.
+ */
+function getTrafficMultiplier() {
+  const hour = new Date().getHours();
+  if (hour < 6)  return 1.1; // Late night — light traffic
+  if (hour < 8)  return 1.3; // Early morning — building up
+  if (hour < 10) return 1.7; // Morning peak
+  if (hour < 17) return 1.4; // Midday
+  if (hour < 20) return 1.8; // Evening peak
+  if (hour < 22) return 1.3; // Evening
+  return 1.2;                // Late evening
+}
+
+/**
+ * Format a raw duration in seconds as a human-readable ETA string,
+ * adjusted for typical time-of-day traffic conditions.
+ */
+export function formatEtaDuration(seconds) {
+  const adjusted = Math.round(seconds * getTrafficMultiplier());
+  const minutes = Math.round(adjusted / 60);
+  if (minutes < 1) return "< 1 min";
+  if (minutes < 60) return minutes === 1 ? "1 min" : `${minutes} mins`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) return hours === 1 ? "1 hr" : `${hours} hrs`;
+  return `${hours} hr ${mins} min`;
+}
+
+/**
+ * Format a distance in km as a human-readable ETA string,
+ * assuming 30 km/h base speed adjusted for time-of-day traffic.
  */
 export function formatEta(km) {
-  const minutes = Math.round((km / 30) * 60);
-  if (minutes < 1) return "< 1 min";
-  if (minutes === 1) return "1 min";
-  return `${minutes} mins`;
+  return formatEtaDuration((km / 30) * 3600);
 }
 
 /**
  * Fetch a driving route from OSRM between two {lat, lng} points.
- * Returns an array of [lat, lng] pairs for use with react-leaflet Polyline,
- * or null if the route could not be fetched.
+ * Returns { coords, durationSeconds } where coords is an array of [lat, lng]
+ * pairs for use with react-leaflet Polyline, and durationSeconds is the raw
+ * OSRM travel time estimate (before traffic adjustment).
+ * Returns null if the route could not be fetched.
  *
  * Accepts an optional AbortSignal so callers can cancel stale requests.
  */
@@ -45,8 +75,9 @@ export async function fetchOsrmRoute(from, to, signal) {
   const data = await res.json();
   const coords = data?.routes?.[0]?.geometry?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2) return null;
+  const durationSeconds = data?.routes?.[0]?.duration ?? null;
   // OSRM returns [lng, lat]; Leaflet expects [lat, lng]
-  return coords.map(([lng, lat]) => [lat, lng]);
+  return { coords: coords.map(([lng, lat]) => [lat, lng]), durationSeconds };
 }
 
 /**

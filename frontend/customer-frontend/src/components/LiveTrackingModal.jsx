@@ -8,7 +8,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { createRealtimeSocket } from "@shared/utils/realtime";
-import { fetchGeocode, fetchOsrmRoute, formatEta, haversineKm } from "@shared/utils/mapUtils";
+import { fetchGeocode, fetchOsrmRoute, formatEta, formatEtaDuration, haversineKm } from "@shared/utils/mapUtils";
 
 const DEFAULT_ZOOM = 14;
 const DEFAULT_CENTER = { lat: 30.3165, lng: 78.0322 };
@@ -66,6 +66,7 @@ function LiveTrackingModal({ open, onClose, booking, authToken }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [secondsAgo, setSecondsAgo] = useState(null);
   const [routeCoords, setRouteCoords] = useState(null);
+  const [routeDuration, setRouteDuration] = useState(null);
   const [mapTile, setMapTile] = useState("street");
   const [geocodedArea, setGeocodedArea] = useState(null);
   const socketRef = useRef(null);
@@ -91,7 +92,9 @@ function LiveTrackingModal({ open, onClose, booking, authToken }) {
     workerPosition && effectiveCustomerPos
       ? haversineKm(workerPosition, effectiveCustomerPos)
       : null;
-  const etaLabel = distanceKm != null ? formatEta(distanceKm) : null;
+  const etaLabel = routeDuration != null
+    ? formatEtaDuration(routeDuration)
+    : distanceKm != null ? formatEta(distanceKm) : null;
 
   // Socket connection
   useEffect(() => {
@@ -157,8 +160,11 @@ function LiveTrackingModal({ open, onClose, booking, authToken }) {
     routeAbortRef.current = controller;
 
     fetchOsrmRoute(workerPosition, effectiveCustomerPos, controller.signal)
-      .then((coords) => {
-        if (coords) setRouteCoords(coords);
+      .then((result) => {
+        if (result) {
+          setRouteCoords(result.coords);
+          if (result.durationSeconds != null) setRouteDuration(result.durationSeconds);
+        }
       })
       .catch(() => {});
   // geocodedArea is added so a route fetch fires once geocoding resolves.
@@ -185,6 +191,7 @@ function LiveTrackingModal({ open, onClose, booking, authToken }) {
       setLastUpdated(null);
       setSecondsAgo(null);
       setRouteCoords(null);
+      setRouteDuration(null);
       setGeocodedArea(null);
       lastRouteFetchRef.current = 0;
     }

@@ -5,7 +5,7 @@ import L from "leaflet";
 import { MapPin, Navigation, Radio, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import { createRealtimeSocket } from "@shared/utils/realtime";
-import { fetchGeocode, fetchOsrmRoute, formatEta, haversineKm } from "@shared/utils/mapUtils";
+import { fetchGeocode, fetchOsrmRoute, formatEta, formatEtaDuration, haversineKm } from "@shared/utils/mapUtils";
 
 const DEFAULT_ZOOM = 14;
 const DEFAULT_CENTER = { lat: 30.3165, lng: 78.0322 };
@@ -67,6 +67,7 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
   const [gpsError, setGpsError] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [routeCoords, setRouteCoords] = useState(null);
+  const [routeDuration, setRouteDuration] = useState(null);
   const [mapTile, setMapTile] = useState("street");
   const [geocodedArea, setGeocodedArea] = useState(null);
 
@@ -97,7 +98,9 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
     workerPosition && effectiveCustomerPos
       ? haversineKm(workerPosition, effectiveCustomerPos)
       : null;
-  const etaLabel = distanceKm != null ? formatEta(distanceKm) : null;
+  const etaLabel = routeDuration != null
+    ? formatEtaDuration(routeDuration)
+    : distanceKm != null ? formatEta(distanceKm) : null;
   const mapCenter = effectiveCustomerPos || DEFAULT_CENTER;
 
   // Start GPS watch when modal opens
@@ -166,8 +169,11 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
     routeAbortRef.current = controller;
 
     fetchOsrmRoute(workerPosition, effectiveCustomerPos, controller.signal)
-      .then((coords) => {
-        if (coords) setRouteCoords(coords);
+      .then((result) => {
+        if (result) {
+          setRouteCoords(result.coords);
+          if (result.durationSeconds != null) setRouteDuration(result.durationSeconds);
+        }
       })
       .catch(() => {});
   // geocodedArea added so route fetch fires once geocoding resolves.
@@ -212,22 +218,35 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
     setIsSharing(true);
   }, [authToken, bookingId]);
 
-  // Clean up on close
+  // Warn before browser tab/window close while sharing is active
+  useEffect(() => {
+    if (!isSharing) return undefined;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isSharing]);
+
+  // Clean up on close — but only stop sharing if worker is NOT actively sharing
   useEffect(() => {
     if (!open) {
-      stopSharing();
-      if (routeAbortRef.current) {
-        routeAbortRef.current.abort();
-        routeAbortRef.current = null;
+      if (!isSharing) {
+        if (routeAbortRef.current) {
+          routeAbortRef.current.abort();
+          routeAbortRef.current = null;
+        }
+        setWorkerPosition(null);
+        setGpsError("");
+        setRouteCoords(null);
+        setRouteDuration(null);
+        setGeocodedArea(null);
+        lastRouteFetchRef.current = 0;
+        lastEmittedPosRef.current = null;
       }
-      setWorkerPosition(null);
-      setGpsError("");
-      setRouteCoords(null);
-      setGeocodedArea(null);
-      lastRouteFetchRef.current = 0;
-      lastEmittedPosRef.current = null;
     }
-  }, [open, stopSharing]);
+  }, [open, isSharing]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -245,6 +264,11 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
   }, [stopSharing]);
 
   if (!open || typeof document === "undefined") return null;
+
+  const handleClose = () => {
+    if (isSharing) return;
+    onClose();
+  };
 
   // Show OSRM road route only — no straight-line fallback to avoid flash
   const polylinePositions = routeCoords;
@@ -266,9 +290,11 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
             </div>
             <button
               type="button"
-              onClick={onClose}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              onClick={handleClose}
+              disabled={isSharing}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Close"
+              title={isSharing ? "Stop sharing before closing" : "Close"}
             >
               <X className="h-4 w-4" />
             </button>
@@ -388,28 +414,37 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
             </div>
 
             {/* Share toggle + close */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={isSharing ? stopSharing : startSharing}
-                disabled={!workerPosition}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isSharing
-                    ? "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                <Radio className={`h-4 w-4 ${isSharing ? "animate-pulse" : ""}`} />
-                {isSharing ? "Stop Sharing Location" : "Share My Location Live"}
-              </button>
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-4">
+              {isSharing && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  Location sharing is active. Stop sharing before closing this panel or leaving the page.
+                </p>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={isSharing ? stopSharing : startSharing}
+                  disabled={!workerPosition}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isSharing
+                      ? "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                >
+                  <Radio className={`h-4 w-4 ${isSharing ? "animate-pulse" : ""}`} />
+                  {isSharing ? "Stop Sharing Location" : "Share My Location Live"}
+                </button>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Close
-              </button>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={isSharing}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  title={isSharing ? "Stop sharing before closing" : undefined}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
