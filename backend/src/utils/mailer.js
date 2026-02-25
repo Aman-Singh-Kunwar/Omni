@@ -1,35 +1,11 @@
-import nodemailer from "nodemailer";
 import logger from "./logger.js";
-
-let transporterCache = null;
 
 function getSenderEmail() {
   return String(process.env.SENDER_EMAIL || "").trim();
 }
 
-function getTransporter() {
-  if (transporterCache) {
-    return transporterCache;
-  }
-
-  const user = String(process.env.SMTP_USER || "").trim();
-  const pass = String(process.env.SMTP_PASS || "").trim();
-
-  if (!user || !pass) {
-    const error = new Error("Email sender is not configured. Set SMTP_USER and SMTP_PASS.");
-    error.statusCode = 500;
-    throw error;
-  }
-
-  transporterCache = nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
-    auth: { user, pass },
-    family: 4
-  });
-
-  return transporterCache;
+function getBrevoApiKey() {
+  return String(process.env.BREVO_API_KEY || "").trim();
 }
 
 async function sendMail({ to, subject, text, html }) {
@@ -40,23 +16,50 @@ async function sendMail({ to, subject, text, html }) {
     throw error;
   }
 
-  const transporter = getTransporter();
+  const apiKey = getBrevoApiKey();
+  if (!apiKey) {
+    const error = new Error("Email sender is not configured. Set BREVO_API_KEY.");
+    error.statusCode = 500;
+    throw error;
+  }
+
   const from = getSenderEmail();
 
+  let response;
   try {
-    await transporter.sendMail({
-      from,
-      to: recipient,
-      subject: String(subject || "").trim() || "Omni Notification",
-      text: String(text || "").trim(),
-      html: String(html || "").trim() || undefined
+    response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": apiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: { email: from },
+        to: [{ email: recipient }],
+        subject: String(subject || "").trim() || "Omni Notification",
+        htmlContent: String(html || "").trim() || undefined,
+        textContent: String(text || "").trim()
+      })
     });
-  } catch (error) {
+  } catch (fetchError) {
     logger.error("Email send failed", {
       to: recipient,
       subject: String(subject || ""),
-      message: error?.message || "Unknown mail error"
+      message: fetchError?.message || "Network error reaching Brevo API"
     });
+    throw fetchError;
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const message = data.message || `Brevo API error: ${response.status}`;
+    logger.error("Email send failed", {
+      to: recipient,
+      subject: String(subject || ""),
+      message
+    });
+    const error = new Error(message);
     throw error;
   }
 }
