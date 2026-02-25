@@ -40,7 +40,8 @@ function getTransporter() {
 
   transporterCache = nodemailer.createTransport({
     service: "gmail",
-    auth: { user, pass }
+    auth: { user, pass },
+    family: 4
   });
   cacheKey = nextCacheKey;
 
