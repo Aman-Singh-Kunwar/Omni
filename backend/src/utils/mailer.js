@@ -2,48 +2,32 @@ import nodemailer from "nodemailer";
 import logger from "./logger.js";
 
 let transporterCache = null;
-let cacheKey = "";
 
-function getMailUser() {
-  return String(process.env.MAIL_USER || "").trim();
-}
-
-function getMailAppPassword() {
-  return String(process.env.MAIL_APP_PASSWORD || "")
-    .replace(/\s+/g, "")
-    .trim();
-}
-
-function getFromAddress() {
-  const configured = String(process.env.MAIL_FROM || "").trim();
-  return configured || getMailUser();
-}
-
-function getTransportCacheKey(user, password) {
-  return `${user}:${password ? "configured" : "missing"}`;
+function getSenderEmail() {
+  return String(process.env.SENDER_EMAIL || "").trim();
 }
 
 function getTransporter() {
-  const user = getMailUser();
-  const pass = getMailAppPassword();
-  const nextCacheKey = getTransportCacheKey(user, pass);
-
-  if (transporterCache && cacheKey === nextCacheKey) {
+  if (transporterCache) {
     return transporterCache;
   }
 
+  const user = String(process.env.SMTP_USER || "").trim();
+  const pass = String(process.env.SMTP_PASS || "").trim();
+
   if (!user || !pass) {
-    const error = new Error("Email sender is not configured. Set MAIL_USER and MAIL_APP_PASSWORD.");
+    const error = new Error("Email sender is not configured. Set SMTP_USER and SMTP_PASS.");
     error.statusCode = 500;
     throw error;
   }
 
   transporterCache = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp-relay.brevo.com",
+    port: 587,
+    secure: false,
     auth: { user, pass },
     family: 4
   });
-  cacheKey = nextCacheKey;
 
   return transporterCache;
 }
@@ -57,9 +41,11 @@ async function sendMail({ to, subject, text, html }) {
   }
 
   const transporter = getTransporter();
+  const from = getSenderEmail();
+
   try {
     await transporter.sendMail({
-      from: getFromAddress(),
+      from,
       to: recipient,
       subject: String(subject || "").trim() || "Omni Notification",
       text: String(text || "").trim(),

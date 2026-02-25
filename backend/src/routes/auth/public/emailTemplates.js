@@ -10,13 +10,15 @@ const EMAIL_MUTED_TEXT_COLOR  = "#475569";
 const EMAIL_BORDER_COLOR      = "#e2e8f0";
 const EMAIL_BG_COLOR          = "#f8fafc";
 
-const isProductionEnv = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-const DEFAULT_ROLE_BASE_URLS = {
-  landing:  isProductionEnv ? "https://omni-landing-page.onrender.com" : "http://localhost:5173",
-  customer: isProductionEnv ? "https://omni-customer.onrender.com"     : "http://localhost:5174",
-  broker:   isProductionEnv ? "https://omni-broker.onrender.com"       : "http://localhost:5175",
-  worker:   isProductionEnv ? "https://omni-worker.onrender.com"       : "http://localhost:5176"
-};
+function getDefaultRoleBaseUrls() {
+  const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+  return {
+    landing:  isProd ? "https://omni-landing-page.onrender.com" : "http://localhost:5173",
+    customer: isProd ? "https://omni-customer.onrender.com"     : "http://localhost:5174",
+    broker:   isProd ? "https://omni-broker.onrender.com"       : "http://localhost:5175",
+    worker:   isProd ? "https://omni-worker.onrender.com"       : "http://localhost:5176"
+  };
+}
 
 function normalizeBaseUrl(value, fallback) {
   const normalized = String(value || fallback || "").trim().replace(/\/+$/, "");
@@ -31,15 +33,16 @@ function getRoleLabel(role) {
 }
 
 function getRoleAppBaseUrl(role) {
-  if (role === "customer") return normalizeBaseUrl(process.env.CUSTOMER_APP_URL, DEFAULT_ROLE_BASE_URLS.customer);
-  if (role === "broker")   return normalizeBaseUrl(process.env.BROKER_APP_URL,   DEFAULT_ROLE_BASE_URLS.broker);
-  if (role === "worker")   return normalizeBaseUrl(process.env.WORKER_APP_URL,   DEFAULT_ROLE_BASE_URLS.worker);
-  return normalizeBaseUrl(process.env.LANDING_APP_URL, DEFAULT_ROLE_BASE_URLS.landing);
+  const defaults = getDefaultRoleBaseUrls();
+  if (role === "customer") return normalizeBaseUrl(process.env.CUSTOMER_APP_URL, defaults.customer);
+  if (role === "broker")   return normalizeBaseUrl(process.env.BROKER_APP_URL,   defaults.broker);
+  if (role === "worker")   return normalizeBaseUrl(process.env.WORKER_APP_URL,   defaults.worker);
+  return normalizeBaseUrl(process.env.LANDING_APP_URL, defaults.landing);
 }
 
 function getRoleLoginUrl(role)  { return `${getRoleAppBaseUrl(role)}/#/login`; }
 function getRoleSignupUrl(role) { return `${getRoleAppBaseUrl(role)}/#/signup`; }
-function getLandingUrl()        { return normalizeBaseUrl(process.env.LANDING_APP_URL, DEFAULT_ROLE_BASE_URLS.landing); }
+function getLandingUrl()        { return normalizeBaseUrl(process.env.LANDING_APP_URL, getDefaultRoleBaseUrls().landing); }
 
 function escapeHtml(value) {
   return String(value || "")
