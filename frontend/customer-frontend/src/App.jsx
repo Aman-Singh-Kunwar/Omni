@@ -12,6 +12,8 @@ const rememberTruthyValues = new Set(["1", "true", "yes", "on"]);
 const rememberFalsyValues = new Set(["0", "false", "no", "off"]);
 const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
 const CustomerAuthPage = lazy(() => import("./components/CustomerAuthPage"));
+const CategoryDetailsPage = lazy(() => import("./pages/customer/CategoryDetailsPage"));
+const ServiceDetailsPage = lazy(() => import("./pages/customer/ServiceDetailsPage"));
 
 function LoadingScreen({ message }) {
   return (
@@ -273,6 +275,14 @@ function App() {
             }
           />
         ))}
+        <Route
+          path="/customer/category/:slug"
+          element={authUser ? <CategoryDetailsPage /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/customer/category/:slug/service/:serviceSlug"
+          element={authUser ? <ServiceDetailsPage /> : <Navigate to="/" replace />}
+        />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

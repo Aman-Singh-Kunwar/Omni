@@ -38,6 +38,10 @@ function parseTimeParts(timeValue) {
 function CustomerBookingFormPage({
   bookingSource,
   selectedService,
+  selectedPlanName,
+  selectedAddOnNames,
+  selectedOfferTitle,
+  selectedOfferDiscount = 0,
   selectedWorkerDetails,
   selectedWorkerServices,
   workersForSelectedService,
@@ -48,7 +52,8 @@ function CustomerBookingFormPage({
   handleBookService,
   onServiceChange,
   onBack,
-  formatInr
+  formatInr,
+  discountPercent = 5
 }) {
   if (bookingSource === "service" && !selectedService) {
     return (
@@ -67,11 +72,15 @@ function CustomerBookingFormPage({
     );
   }
   const selectedServicePrice = Number(selectedService?.price || 0);
-  const discountPercent = 5;
+  const appliedOfferDiscount = bookingSource === "service" ? Math.max(0, Number(selectedOfferDiscount || 0)) : 0;
+  const priceBeforeOffer = selectedServicePrice > 0 ? selectedServicePrice + appliedOfferDiscount : 0;
   const isDiscountApplied = bookingForm.applyDiscount !== false;
-  const discountAmount =
+  const platformDiscountAmount =
     isDiscountApplied && selectedServicePrice > 0 ? Math.round(selectedServicePrice * (discountPercent / 100)) : 0;
-  const finalBookingAmount = selectedServicePrice > 0 ? Math.max(0, selectedServicePrice - discountAmount) : 0;
+  const finalBookingAmount = selectedServicePrice > 0 ? Math.max(0, selectedServicePrice - platformDiscountAmount) : 0;
+  const normalizedAddOnNames = Array.isArray(selectedAddOnNames)
+    ? selectedAddOnNames.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
   const [timeParts, setTimeParts] = useState(() => parseTimeParts(bookingForm.time));
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const hourOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1)), []);
@@ -123,14 +132,30 @@ function CustomerBookingFormPage({
               ? "Worker will be assigned automatically from available workers."
               : "Review worker details and choose one of their services."}
           </p>
-          <div className="mt-4 max-w-2xl rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payment Receipt</p>
-                <p className="mt-1 text-sm text-gray-600">Review amount before booking.</p>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                <input
+            <div className="mt-4 max-w-2xl rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payment Receipt</p>
+                  <p className="mt-1 text-sm text-gray-600">Review amount before booking.</p>
+                  {bookingSource === "service" && (
+                    <div className="mt-2 space-y-1 text-xs text-gray-700">
+                      {selectedPlanName && <p>+ Plan: {selectedPlanName}</p>}
+                      {normalizedAddOnNames.length > 0 ? (
+                        <p>+ Add-ons: {normalizedAddOnNames.join(", ")}</p>
+                      ) : (
+                        <p>+ No add-ons selected</p>
+                      )}
+                      {selectedOfferTitle && (
+                        <p className="text-indigo-700">
+                          + Offer: {selectedOfferTitle}
+                          {appliedOfferDiscount > 0 ? ` (-${formatInr(appliedOfferDiscount)})` : ""}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
                   type="checkbox"
                   checked={isDiscountApplied}
                   onChange={(event) => setBookingForm((prev) => ({ ...prev, applyDiscount: event.target.checked }))}
@@ -140,18 +165,34 @@ function CustomerBookingFormPage({
               </label>
             </div>
             <div className="mt-4 space-y-2 text-sm">
+              {bookingSource === "service" && appliedOfferDiscount > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-gray-600">Price before offer</p>
+                  <p className="font-semibold text-gray-900">
+                    {priceBeforeOffer > 0 ? formatInr(priceBeforeOffer) : "Select service first"}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-4">
-                <p className="text-gray-600">Total amount</p>
+                <p className="text-gray-600">{bookingSource === "service" ? "Amount after offer" : "Total amount"}</p>
                 <p className="font-semibold text-gray-900">
                   {selectedServicePrice > 0 ? formatInr(selectedServicePrice) : "Select service first"}
                 </p>
               </div>
+              {bookingSource === "service" && selectedOfferTitle && (
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-gray-600">Offer discount</p>
+                  <p className="font-semibold text-indigo-700">
+                    {appliedOfferDiscount > 0 ? `- ${formatInr(appliedOfferDiscount)}` : "Applied"}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-4">
-                <p className="text-gray-600">Discount</p>
+                <p className="text-gray-600">Platform discount</p>
                 <p className={`font-semibold ${isDiscountApplied ? "text-green-700" : "text-gray-500"}`}>
                   {selectedServicePrice > 0
                     ? isDiscountApplied
-                      ? `- ${formatInr(discountAmount)} (${discountPercent}% off)`
+                      ? `- ${formatInr(platformDiscountAmount)} (${discountPercent}% off)`
                       : "Not applied"
                     : "Select service first"}
                 </p>

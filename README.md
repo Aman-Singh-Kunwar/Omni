@@ -364,13 +364,25 @@ This runs `build` for all workspaces where the script exists.
 6. Completed jobs can be paid/reviewed by customer.
 7. Broker commission and worker net values are computed by backend helpers.
 
-### 5) Broker-Worker Linking
+### 5) Customer Service Discovery Flow
+
+- Customer Home flow: `Dashboard -> Category Details -> Service View Details -> Booking Form`.
+- Home hero CTA (`Explore Care Plans`) scrolls to the `Your Home Needs` section on the same page.
+- Category cards use `Explore`, and service cards use `View Details` to open category and service detail pages.
+- Service View Details page includes:
+  - Structured hero summary (category tag, rating, pricing, highlights, and CTAs).
+  - Dynamic plans, combos/add-ons, and interactive offers.
+  - Sticky bottom summary with compact `Bill Details` and expandable `more details`.
+  - `Continue to Booking` passes query params: `service`, `plan`, `addons`, `offer`, `discount`, `price`.
+- Booking form payment receipt shows selected plan, add-ons, applied offer, offer discount, platform discount, and final total.
+
+### 6) Broker-Worker Linking
 
 - Broker accounts have a generated 6-char broker code.
 - Worker profile can attach to broker via broker code.
 - Broker dashboards aggregate linked worker data and completed booking commissions.
 
-### 6) Dashboard UX Behavior
+### 7) Dashboard UX Behavior
 
 - Mobile nav uses a 3-dot menu for route sections only.
 - Profile menu is separate on mobile and contains account actions (profile/switch role/logout).
@@ -380,8 +392,11 @@ This runs `build` for all workspaces where the script exists.
 - Customer booking includes a blurred map-picker modal with map search, current location, draggable pin selection, and manual location text fallback.
 - Mobile inner pages use `ArrowLeft + Back`; navigation goes to previous route when available, with dashboard fallback.
 - Browser tab icon (favicon) uses the Omni logo in landing + all role apps.
+- `Talk to a Care Advisor` uses category-aware theming on category details pages.
+- `Request a Call Back` opens a modal with validation and success toast feedback.
+- `Chat on WhatsApp` opens a prefilled message: `Hi, I need help regarding {Category} - {Plan Name}`.
 
-### 7) Realtime Booking Sync (Socket.IO)
+### 8) Realtime Booking Sync (Socket.IO)
 
 - Backend authenticates socket connections using the same JWT token used for API calls.
 - Customer, broker, and worker apps subscribe to booking updates and refresh relevant dashboard data on `booking:changed`.
@@ -393,7 +408,7 @@ This runs `build` for all workspaces where the script exists.
   - Road route between worker and customer is fetched from the OSRM routing API and re-fetched at most once every 5 seconds as the worker moves (leading-edge throttle). Each fetch uses an `AbortController` to cancel any in-flight request before starting a new one, preventing stale route responses from overwriting a newer route.
   - If the booking has no GPS coordinates (customer typed a text address only), both modals geocode the address via Nominatim using a progressive comma-split fallback that rejects results broader than 50 km, then display an approximate-area circle on the map.
 
-### 8) Customer–Worker Real-Time Chat
+### 9) Customer–Worker Real-Time Chat
 
 - Chat is available for bookings in `confirmed`, `in-progress`, or `upcoming` status.
 - Customer opens Chat from My Bookings; worker opens Chat from Schedule — both use the shared `ChatModal` component.
@@ -405,7 +420,7 @@ This runs `build` for all workspaces where the script exists.
 - **Edit mode**: in-place edit with banner + Escape to cancel; `(edited)` label on the bubble after save.
 - Chat input is locked (read-only) when booking status is `completed`, `cancelled`, or `not-provided`.
 
-### 9) Profile Validation Rules
+### 10) Profile Validation Rules
 
 - Phone number is optional, but if provided it must contain digits only and be 10-13 characters long.
 - Gender values currently supported are: `male`, `female`, `prefer_not_to_say`, and `other`.
@@ -443,6 +458,7 @@ Core routes:
 
 - Customer:
   - `GET /customer/dashboard`
+  - `POST /customer/advisor-requests`
   - `POST /bookings`
   - `PATCH /customer/bookings/:bookingId/cancel`
   - `DELETE /customer/bookings/:bookingId`
@@ -450,6 +466,7 @@ Core routes:
   - `PATCH /customer/bookings/:bookingId/pay`
   - `PATCH /customer/bookings/:bookingId/review`
   - `GET /bookings/:bookingId/chat`
+  - `POST /customer/advisor-requests` requires authenticated `customer` role and stores callback requests in MongoDB `advisorRequests`.
 
 - Broker:
   - `GET /broker/dashboard`
@@ -460,6 +477,16 @@ Core routes:
   - `GET /worker/dashboard`
   - `GET /worker/reviews`
   - `PATCH /worker/bookings/:bookingId`
+
+Advisor callback request payload (`POST /customer/advisor-requests`):
+
+- `fullName` (required)
+- `phoneNumber` (required, 10 digits validated)
+- `category` (required)
+- `selectedPlan` (optional)
+- `preferredTime` (required)
+- `message` (optional)
+- Success response: `201` with confirmation message and `advisorRequestId`.
 
 ## Data Model Overview
 
@@ -479,6 +506,19 @@ Core routes:
 
 ### Service
 - Catalog service documents with base price, category, provider count, and rating.
+
+### AdvisorRequest
+- Stores customer callback requests submitted from `Talk to a Care Advisor`.
+- Fields:
+  - `customerId`
+  - `fullName`
+  - `phoneNumber`
+  - `category`
+  - `selectedPlan`
+  - `preferredTime`
+  - `message`
+  - `status`
+- Collection: `advisorRequests`.
 
 ## Troubleshooting
 

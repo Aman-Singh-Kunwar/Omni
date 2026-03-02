@@ -27,6 +27,7 @@ const CustomerProfilePage = lazy(() => import('../pages/customer/CustomerProfile
 const CustomerSettingsPage = lazy(() => import('../pages/customer/CustomerSettingsPage'));
 
 const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Johnson', userEmail = '', authToken = '' }) => {
+  const bookingDiscountPercent = 5;
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -121,10 +122,23 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   const needsProfileData = activeTab === 'profile';
   const bookingQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
+    const rawPrice = Number(params.get('price'));
+    const rawOfferDiscount = Number(params.get('discount'));
+    const parsedPrice = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round(rawPrice) : 0;
+    const parsedOfferDiscount = Number.isFinite(rawOfferDiscount) && rawOfferDiscount > 0 ? Math.round(rawOfferDiscount) : 0;
+    const rawAddons = String(params.get('addons') || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
     return {
       source: params.get('source') === 'worker' ? 'worker' : 'service',
       service: String(params.get('service') || '').trim(),
-      workerId: String(params.get('workerId') || '').trim()
+      workerId: String(params.get('workerId') || '').trim(),
+      plan: String(params.get('plan') || '').trim(),
+      addons: rawAddons,
+      offer: String(params.get('offer') || '').trim(),
+      discount: parsedOfferDiscount,
+      price: parsedPrice
     };
   }, [location.search]);
   const favoritesStorageKey = useMemo(
@@ -269,7 +283,19 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
   );
   const bookingSource = bookingQuery.source;
   const selectedServiceName = bookingSource === 'worker' ? String(bookingForm.service || '').trim() : bookingQuery.service;
-  const selectedService = selectedServiceName ? getServiceMetaByName(selectedServiceName) : null;
+  const selectedService = useMemo(() => {
+    if (!selectedServiceName) {
+      return null;
+    }
+    const baseMeta = getServiceMetaByName(selectedServiceName);
+    if (!baseMeta) {
+      return null;
+    }
+    if (bookingSource === 'service' && Number(bookingQuery.price) > 0) {
+      return { ...baseMeta, price: Number(bookingQuery.price) };
+    }
+    return baseMeta;
+  }, [bookingQuery.price, bookingSource, selectedServiceName]);
 
   const workersForSelectedService = useMemo(() => {
     const selectedName = String(selectedService?.name || '')
@@ -666,12 +692,6 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     navigate(`/bookings/new?${params.toString()}`);
   };
 
-  const handleServiceSelect = (service) => {
-    setBookingForm((prev) => ({ ...prev, workerId: '', service: '', applyDiscount: true }));
-    setBookingStatus({ loading: false, error: '' });
-    navigateToBooking({ source: 'service', serviceName: service.name });
-  };
-
   const closeBookingModal = ({ navigateHome = true } = {}) => {
     setBookingStatus({ loading: false, error: '' });
     setBookingForm({
@@ -821,6 +841,13 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
     setBookingStatus({ loading: true, error: '' });
     try {
       const bookedServiceMeta = getServiceMetaByName(selectedServiceName);
+      const baseAmount = Number(
+        selectedService?.price || bookedServiceMeta?.price || getRandomServicePrice(selectedServiceName)
+      );
+      const isDiscountApplied = bookingForm.applyDiscount !== false;
+      const discountAmount =
+        isDiscountApplied && baseAmount > 0 ? Math.round(baseAmount * (bookingDiscountPercent / 100)) : 0;
+      const bookingAmount = baseAmount > 0 ? Math.max(0, baseAmount - discountAmount) : 0;
       const bookingResponse = await api.post(
         '/bookings',
         {
@@ -833,7 +860,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           locationLng: Number.isFinite(Number(bookingForm.locationLng)) ? Number(bookingForm.locationLng) : null,
           description: bookingForm.description,
           applyDiscount: bookingForm.applyDiscount !== false,
-          amount: Number(bookedServiceMeta?.price || 0) > 0 ? Number(bookedServiceMeta.price) : getRandomServicePrice(selectedServiceName)
+          amount: bookingAmount
         },
         {
           headers: { Authorization: `Bearer ${authToken}` }
@@ -1141,8 +1168,6 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           userName={userName}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          services={services}
-          handleServiceSelect={handleServiceSelect}
           stats={stats}
           featuredProviders={featuredProviders}
           favoriteWorkerIds={favoriteWorkerIds}
@@ -1159,6 +1184,10 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
         <CustomerBookingFormPage
           bookingSource={bookingSource}
           selectedService={selectedService}
+          selectedPlanName={bookingQuery.plan}
+          selectedAddOnNames={bookingQuery.addons}
+          selectedOfferTitle={bookingQuery.offer}
+          selectedOfferDiscount={bookingQuery.discount}
           selectedWorkerDetails={selectedWorkerDetails}
           selectedWorkerServices={selectedWorkerServices}
           workersForSelectedService={workersForSelectedService}
@@ -1173,6 +1202,7 @@ const CustomerDashboard = ({ onLogout, brokerUrl, workerUrl, userName = 'Alex Jo
           }}
           onBack={navigateBack}
           formatInr={formatInr}
+          discountPercent={bookingDiscountPercent}
         />
       );
     }

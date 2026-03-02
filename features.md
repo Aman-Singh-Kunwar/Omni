@@ -37,6 +37,16 @@
 ## Customer Frontend
 
 - Dashboard tabs: Home, Book Service, Bookings, Favorites, Profile, Settings.
+- Customer navigation flow supports: `Dashboard -> Category -> Service Details -> Booking Form`.
+- Home hero CTA (`Explore Care Plans`) smoothly scrolls to `Your Home Needs`.
+- Category cards use `Explore` and service cards use `View Details` for structured discovery.
+- Service view-details page includes a structured hero, dynamic plans, combos/add-ons, interactive offers, and sticky booking summary.
+- Sticky booking summary includes compact `Bill Details` with expandable `more details`.
+- Continue-to-booking sends selected state through query params: `service`, `plan`, `addons`, `offer`, `discount`, `price`.
+- Booking form payment receipt displays selected plan, add-ons, offer title, offer discount, platform discount, and final total.
+- Category pages include category-themed `Talk to a Care Advisor` panel with:
+  - `Request a Call Back` modal (validated form + success toast)
+  - `Chat on WhatsApp` prefilled support message
 - Service and worker search on home page.
 - Dynamic provider count per service based on currently available workers.
 - Service cards with deterministic price/rating/provider display.
@@ -134,6 +144,8 @@
   - `customer/booking/createRoutes.js`
   - `customer/booking/lifecycleRoutes.js`
   - `customer/booking/settlementRoutes.js`
+- Customer advisor callback route:
+  - `POST /customer/advisor-requests` stores callback requests in MongoDB `advisorRequests` collection with customer-role auth checks and phone validation.
 - Shared backend route helpers split into dedicated modules (`helpers/auth`, `helpers/broker`, `helpers/booking`, `helpers/worker`) with barrel export.
 - Gmail-only account policy for signup and profile email updates.
 - Role-specific signup/login and role switch flow using JWT.
