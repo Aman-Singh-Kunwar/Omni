@@ -9,6 +9,7 @@ import {
   readAuthUserFromRequest
 } from "../helpers.js";
 import { buildBrokerAttributionScope } from "./shared.js";
+import { resolvePhotoUrlFromUser } from "../../schemas/profile.js";
 
 const router = express.Router();
 
@@ -103,6 +104,7 @@ router.get("/broker/workers", async (req, res, next) => {
         name: worker.name || "Worker",
         email: worker.email || "",
         phone: worker.workerProfile?.phone || "",
+        photoUrl: resolvePhotoUrlFromUser(worker, "workerProfile"),
         servicesProvided: Array.isArray(worker.workerProfile?.servicesProvided) ? worker.workerProfile.servicesProvided : [],
         isAvailable: worker.workerProfile?.isAvailable !== false,
         totalJobs: stats.totalJobs,

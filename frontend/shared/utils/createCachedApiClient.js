@@ -60,8 +60,6 @@ function buildCacheKey(config = {}) {
 export function createCachedApiClient(apiBase, options = {}) {
   const defaultCacheTtlMs = Number(options.defaultCacheTtlMs || 30000);
   const memoryCache = new Map();
-  // Track every storage key we write so clearAllCache never has to iterate
-  // all of sessionStorage — O(m cache entries) instead of O(n total storage).
   const storageKeySet = new Set();
   const storage = getStorage();
   const api = axios.create({
@@ -137,7 +135,6 @@ export function createCachedApiClient(apiBase, options = {}) {
       storage.setItem(cacheKey, JSON.stringify(payload));
       storageKeySet.add(cacheKey);
     } catch (_error) {
-      // Ignore storage quota or private mode failures.
     }
   };
 
@@ -150,7 +147,6 @@ export function createCachedApiClient(apiBase, options = {}) {
       try {
         storage.removeItem(key);
       } catch (_error) {
-        // Ignore storage removal failures.
       }
     });
     storageKeySet.clear();

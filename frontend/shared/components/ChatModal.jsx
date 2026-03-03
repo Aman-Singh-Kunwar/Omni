@@ -32,12 +32,9 @@ function ChatModal({
   const [connected,    setConnected]    = useState(false);
   const [selectedIds,  setSelectedIds]  = useState(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
-  // editingMsg: { messageId, originalText } | null
   const [editingMsg,   setEditingMsg]   = useState(null);
-  // slide-up animation
   const [mounted,      setMounted]      = useState(false);
   const [animating,    setAnimating]    = useState(false);
-  // counterpart presence
   const [otherOnline,  setOtherOnline]  = useState(false);
 
   const socketRef      = useRef(null);
@@ -57,7 +54,7 @@ function ChatModal({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // ── history ───────────────────────────────────────────────────────────────
+
   const loadHistory = useCallback(async (socket) => {
     if (!bookingId || !authToken) return;
     setLoading(true);
@@ -80,7 +77,7 @@ function ChatModal({
     }
   }, [bookingId, authToken]);
 
-  // ── socket lifecycle ──────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!open || !bookingId || !authToken) return undefined;
 
@@ -160,7 +157,6 @@ function ChatModal({
       if (!data || data.bookingId !== bookingId) return;
       if (data.senderRole === senderRole) return;
       setOtherOnline(data.online);
-      // Ping-pong: respond once so the other side knows we're here
       if (data.online && !hasRespondedPresence.current) {
         hasRespondedPresence.current = true;
         socket.emit("chat:presence", { bookingId, online: true });
@@ -190,15 +186,14 @@ function ChatModal({
     };
   }, [open, bookingId, authToken, senderRole, loadHistory]);
 
-  // ── auto-scroll ───────────────────────────────────────────────────────────
+
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  // ── slide-up mount / unmount animation ────────────────────────────────────
+
   useEffect(() => {
     let raf1, raf2, timeout;
     if (open) {
       setMounted(true);
-      // double-rAF ensures initial (hidden) paint before transitioning
       raf1 = requestAnimationFrame(() => {
         raf2 = requestAnimationFrame(() => setAnimating(true));
       });
@@ -213,7 +208,7 @@ function ChatModal({
     };
   }, [open]);
 
-  // ── focus input when opening or when entering edit mode ───────────────────
+
   useEffect(() => {
     if (open && !isSelectMode && !isLocked) {
       const t = setTimeout(() => inputRef.current?.focus(), 150);
@@ -233,13 +228,12 @@ function ChatModal({
     }
   }, [editingMsg]);
 
-  // ── send / save edit ──────────────────────────────────────────────────────
+
   const handleSend = useCallback(() => {
     const text = inputText.trim();
     if (!text || sending || isLocked) return;
 
     if (editingMsg) {
-      // Save edit
       if (text === editingMsg.originalText) { setEditingMsg(null); setInputText(""); return; }
       setMessages((prev) =>
         prev.map((m) => m.messageId === editingMsg.messageId ? { ...m, text, edited: true } : m)
@@ -273,7 +267,7 @@ function ChatModal({
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
-  // ── selection helpers ─────────────────────────────────────────────────────
+
   const enterSelectWithMsg = useCallback((msgId) => {
     setIsSelectMode(true);
     setSelectedIds(new Set([msgId]));
@@ -298,14 +292,12 @@ function ChatModal({
     setSelectedIds(new Set());
   }, []);
 
-  // Desktop: double-click to start selection
   const onBubbleDblClick = useCallback((msgId, isOwn) => {
     if (!isOwn || isLocked) return;
     if (dblClickTimer.current) { clearTimeout(dblClickTimer.current); dblClickTimer.current = null; }
     enterSelectWithMsg(msgId);
   }, [isLocked, enterSelectWithMsg]);
 
-  // Mobile: long-press to start selection
   const onBubbleTouchStart = useCallback((msgId, isOwn) => {
     if (!isOwn || isSelectMode || isLocked) return;
     longPressTimer.current = setTimeout(() => { enterSelectWithMsg(msgId); }, 500);
@@ -315,7 +307,7 @@ function ChatModal({
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
   }, []);
 
-  // ── delete selected ───────────────────────────────────────────────────────
+
   const handleDeleteSelected = useCallback(() => {
     if (!selectedIds.size) return;
     const messageIds = [...selectedIds];
@@ -326,7 +318,7 @@ function ChatModal({
     socketRef.current?.emit("chat:delete", { bookingId, messageIds });
   }, [selectedIds, bookingId]);
 
-  // ── edit selected (only when exactly 1 message selected) ─────────────────
+
   const handleEditSelected = useCallback(() => {
     if (selectedIds.size !== 1) return;
     const msgId = [...selectedIds][0];
@@ -339,7 +331,6 @@ function ChatModal({
 
   if (!mounted) return null;
 
-  // Which own messages are in the selection (for header action availability)
   const selectedOwnCount = [...selectedIds].filter((id) =>
     messages.find((m) => m.messageId === id && m.senderRole === senderRole)
   ).length;

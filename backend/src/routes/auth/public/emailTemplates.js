@@ -1,6 +1,3 @@
-// Email template builders for signup verification and forgot-password flows.
-// Mirror of auth/account/emailTemplates.js for the public auth routes.
-
 const SIGNUP_VERIFICATION_EXPIRY_MINUTES = Math.max(1, Number(process.env.SIGNUP_VERIFICATION_EXPIRY_MINUTES || 10));
 const FORGOT_PASSWORD_EXPIRY_MINUTES     = Math.max(1, Number(process.env.FORGOT_PASSWORD_EXPIRY_MINUTES || 10));
 

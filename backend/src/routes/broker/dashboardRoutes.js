@@ -10,6 +10,7 @@ import {
   readAuthUserFromRequest
 } from "../helpers.js";
 import { buildBrokerAttributionScope } from "./shared.js";
+import { resolvePhotoUrlFromUser } from "../../schemas/profile.js";
 
 const router = express.Router();
 
@@ -139,6 +140,7 @@ router.get("/broker/dashboard", async (req, res, next) => {
           id: worker._id,
           name: worker.name,
           service: servicesProvided[0] || "General Service",
+          photoUrl: resolvePhotoUrlFromUser(worker, "workerProfile"),
           rating: averageRating,
           jobs: completedJobs,
           brokerCommission

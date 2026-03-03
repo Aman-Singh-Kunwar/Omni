@@ -44,7 +44,6 @@ router.post("/auth/delete-account", requireAuth, async (req, res, next) => {
       if (!req.authUser.workerProfile) {
         req.authUser.workerProfile = {};
       }
-      // Deleted workers should not appear in provider lists and counts.
       req.authUser.workerProfile.isAvailable = false;
     }
     await req.authUser.save();

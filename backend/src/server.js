@@ -32,6 +32,22 @@ connectMongo()
   .then(() => {
     const server = http.createServer(app);
     initSocketServer(server);
+    server.on("error", (error) => {
+      if (error?.code === "EADDRINUSE") {
+        logger.errorOnce(`port_in_use:${PORT}`, "Backend port already in use", {
+          port: PORT,
+          message: "Another backend instance is already running on this port."
+        });
+        process.exit(1);
+      }
+
+      logger.errorOnce(`server_listen_error:${error?.message || "unknown"}`, "Backend server failed to start", {
+        port: PORT,
+        message: error?.message || "Unknown server listen error",
+        stack: error?.stack
+      });
+      process.exit(1);
+    });
     server.listen(PORT, () => {
       logger.infoOnce("backend_listening", "Backend listening", { port: PORT });
     });

@@ -22,8 +22,6 @@ router.post("/bookings", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "service, date, and time are required to create a booking." });
     }
 
-    // Build a case-insensitive regex for the service so MongoDB filters workers
-    // directly — avoids fetching the entire available-worker set into RAM.
     const normalizedService = normalizeForCompare(service);
     const serviceRegex = new RegExp(
       `^${normalizedService.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,

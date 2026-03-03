@@ -4,7 +4,12 @@ import { ArrowLeft, Check, Copy, Share2, X } from "lucide-react";
 import api from "../../api";
 import { useAutoDismissValue } from "@shared/hooks/useAutoDismissNotice";
 
-function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {} }) {
+function toAvatarUrl(name) {
+  const encodedName = encodeURIComponent(String(name || "Worker"));
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=065f46&color=ffffff&size=240`;
+}
+
+function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWorkerProfile }) {
   const navigate = useNavigate();
   const handleBackClick = () => {
     if (window.history.length > 1) {
@@ -152,19 +157,33 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {} }) {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {workers.map((worker) => (
             <div key={worker.id} className="bg-white/80 shadow-sm rounded-xl border p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-gray-900">{worker.name}</p>
-                  <p className="text-sm text-gray-600">{worker.email || "No email"}</p>
-                  <p className="text-sm text-gray-600">{worker.phone || "No phone"}</p>
+              <div className="flex items-start gap-4">
+                <img
+                  src={worker.photoUrl || toAvatarUrl(worker.name)}
+                  alt={worker.name}
+                  className="h-16 w-16 rounded-full border-2 border-emerald-100 bg-gray-100 object-cover flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => onViewWorkerProfile?.(worker)}
+                        className="text-left text-base font-semibold text-gray-900 hover:text-emerald-700 truncate block"
+                      >
+                        {worker.name}
+                      </button>
+                      <p className="text-sm text-gray-600 truncate">{worker.email || "No email"}</p>
+                      <p className="text-sm text-gray-600">{worker.phone || "No phone"}</p>
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${worker.isAvailable ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700"
+                        }`}
+                    >
+                      {worker.isAvailable ? "Available" : "Unavailable"}
+                    </span>
+                  </div>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                    worker.isAvailable ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {worker.isAvailable ? "Available" : "Unavailable"}
-                </span>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -191,6 +210,13 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {} }) {
               <p className="mt-3 text-sm text-gray-600">
                 Services: {Array.isArray(worker.servicesProvided) && worker.servicesProvided.length ? worker.servicesProvided.join(", ") : "N/A"}
               </p>
+              <button
+                type="button"
+                onClick={() => onViewWorkerProfile?.(worker)}
+                className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              >
+                View Job Profile
+              </button>
             </div>
           ))}
         </div>

@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.get("/workers/available", async (_req, res, next) => {
   try {
-    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+    res.set("Cache-Control", "no-store");
     const workers = await getAvailableWorkers();
     return res.json({ workers });
   } catch (error) {
@@ -23,8 +23,6 @@ router.get("/services", async (_req, res, next) => {
   }
 });
 
-// Combined endpoint: returns workers + services in a single round-trip.
-// Used by the customer home page which needs both simultaneously.
 router.get("/catalog", async (_req, res, next) => {
   try {
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");

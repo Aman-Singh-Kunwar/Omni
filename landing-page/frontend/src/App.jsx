@@ -1,10 +1,10 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import AuthPage from "./components/AuthPage";
+import LandingPage from "./components/LandingPage";
 
 const defaultApiBase = import.meta.env.PROD ? "https://omni-backend-4t7s.onrender.com/api" : "http://localhost:5000/api";
 const apiBase = import.meta.env.VITE_API_URL || defaultApiBase;
-const LandingPage = lazy(() => import("./components/LandingPage"));
-const AuthPage = lazy(() => import("./components/AuthPage"));
 
 const defaultConfig = {
   apps: {
@@ -14,20 +14,6 @@ const defaultConfig = {
     worker: import.meta.env.PROD ? "https://omni-worker.onrender.com" : "http://localhost:5176"
   }
 };
-
-function RouteLoader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative h-16 w-16">
-          <div className="h-16 w-16 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" />
-          <img src="/omni-logo.png" alt="Omni" className="absolute inset-0 m-auto h-9 w-9 rounded-full object-contain" />
-        </div>
-        <p className="text-sm font-medium text-slate-500">Loading page...</p>
-      </div>
-    </div>
-  );
-}
 
 function ScrollToTop() {
   const location = useLocation();
@@ -52,7 +38,6 @@ function App() {
         const data = await response.json();
         setConfig(data);
       } catch (_error) {
-        // Keep fallback URLs.
       }
     };
 
@@ -67,7 +52,7 @@ function App() {
   };
 
   return (
-    <Suspense fallback={<RouteLoader />}>
+    <>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -75,7 +60,7 @@ function App() {
         <Route path="/signup" element={<AuthPage mode="signup" {...routeProps} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Suspense>
+    </>
   );
 }
 

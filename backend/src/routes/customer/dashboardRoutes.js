@@ -2,13 +2,14 @@ import express from "express";
 import Booking from "../../models/Booking.js";
 import Service from "../../models/Service.js";
 import User from "../../models/User.js";
+import { resolvePhotoUrlFromUser } from "../../schemas/profile.js";
 import { expireTimedOutPendingBookings, getAvailableWorkers, readAuthUserFromRequest } from "../helpers.js";
 
 const router = express.Router();
 
 router.get("/customer/dashboard", async (req, res, next) => {
   try {
-    res.set("Cache-Control", "private, max-age=20, stale-while-revalidate=40");
+    res.set("Cache-Control", "no-store");
     const authUser = await readAuthUserFromRequest(req);
     const requestedCustomerName = String(req.query.customer || "").trim();
     const isAuthCustomer = authUser?.role === "customer";
@@ -106,6 +107,7 @@ router.get("/customer/dashboard", async (req, res, next) => {
           name: linkedWorker?.name || booking.workerName || "",
           email: linkedWorker?.email || booking.workerEmail || "",
           phone: linkedWorker?.workerProfile?.phone || booking.workerPhone || "",
+          photoUrl: linkedWorker ? resolvePhotoUrlFromUser(linkedWorker, "workerProfile") : "",
           servicesProvided
         }
       };

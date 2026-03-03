@@ -1,6 +1,11 @@
 import React from "react";
 import { Users, Calendar, Star, DollarSign } from "lucide-react";
 
+function toAvatarUrl(name) {
+  const encodedName = encodeURIComponent(String(name || "Worker"));
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=065f46&color=ffffff&size=240`;
+}
+
 function StatCard({ icon: Icon, title, value }) {
   return (
     <div className="bg-white/80 p-5 shadow-sm rounded-xl border">
@@ -19,7 +24,7 @@ function StatCard({ icon: Icon, title, value }) {
   );
 }
 
-function BrokerOverviewPage({ stats, topWorkers }) {
+function BrokerOverviewPage({ stats, topWorkers, onViewWorkerProfile }) {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -36,11 +41,19 @@ function BrokerOverviewPage({ stats, topWorkers }) {
               {topWorkers.map((worker) => (
                 <div key={worker.id} className="flex items-start justify-between gap-3 rounded-lg bg-gray-50/80 p-3">
                   <div className="flex min-w-0 flex-1 items-center">
-                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-sm font-medium text-gray-700">{worker.name.charAt(0)}</span>
-                    </div>
+                    <img
+                      src={worker.photoUrl || toAvatarUrl(worker.name)}
+                      alt={worker.name}
+                      className="h-10 w-10 rounded-full border border-emerald-100 bg-gray-100 object-cover flex-shrink-0"
+                    />
                     <div className="ml-3 min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900">{worker.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => onViewWorkerProfile?.(worker)}
+                        className="truncate text-left text-sm font-medium text-gray-900 hover:text-emerald-700"
+                      >
+                        {worker.name}
+                      </button>
                       <p className="truncate text-sm text-gray-500">{worker.service}</p>
                     </div>
                   </div>
@@ -52,6 +65,13 @@ function BrokerOverviewPage({ stats, topWorkers }) {
                       <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" /> {worker.rating}
                     </p>
                     <p className="whitespace-nowrap text-sm text-gray-500">{worker.jobs} jobs</p>
+                    <button
+                      type="button"
+                      onClick={() => onViewWorkerProfile?.(worker)}
+                      className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      View Job Profile
+                    </button>
                   </div>
                 </div>
               ))}

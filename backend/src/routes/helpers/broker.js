@@ -1,6 +1,7 @@
 import Booking from "../../models/Booking.js";
 import User from "../../models/User.js";
 import { safeNormalizeBrokerCode } from "./common.js";
+import logger from "../../utils/logger.js";
 
 const BROKER_CODE_LENGTH = 6;
 const BROKER_CODE_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -54,19 +55,25 @@ async function ensureBrokerCodeForUser(user) {
     return user;
   }
 
+  logger.debug(`Generating broker code for user ${user._id} (${user.email})`);
+
   if (!user.brokerProfile) {
     user.brokerProfile = {};
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      user.brokerProfile.brokerCode = await generateUniqueBrokerCode(user._id);
+      const newCode = await generateUniqueBrokerCode(user._id);
+      user.brokerProfile.brokerCode = newCode;
       await user.save();
+      logger.info(`Generated broker code ${newCode} for user ${user._id} (${user.email})`);
       return user;
     } catch (error) {
       if (error?.code === 11000) {
+        logger.debug(`Broker code collision on attempt ${attempt + 1}, retrying...`);
         continue;
       }
+      logger.error(`Failed to generate broker code for user ${user._id}:`, error);
       throw error;
     }
   }
@@ -248,7 +255,16 @@ async function getWorkersLinkedToBroker(brokerUser) {
     return { brokerCode: "", workers: [], workerIds: [], workerNames: [], workerEmails: [] };
   }
 
-  const brokerCode = safeNormalizeBrokerCode(brokerUser.brokerProfile?.brokerCode);
+  let brokerCode = safeNormalizeBrokerCode(brokerUser.brokerProfile?.brokerCode);
+
+  if (!brokerCode && brokerUser._id) {
+    const freshBroker = await User.findById(brokerUser._id);
+    if (freshBroker?.role === "broker") {
+      await ensureBrokerCodeForUser(freshBroker);
+      brokerCode = safeNormalizeBrokerCode(freshBroker.brokerProfile?.brokerCode);
+    }
+  }
+
   const workerFilter = {
     role: "worker",
     $or: [{ "workerProfile.brokerId": brokerUser._id }, ...(brokerCode ? [{ "workerProfile.brokerCode": brokerCode }] : [])]

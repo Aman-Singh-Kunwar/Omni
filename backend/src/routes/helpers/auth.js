@@ -12,6 +12,7 @@ function toAuthUser(user) {
     id: String(user._id),
     name: user.name,
     email: user.email,
+    emailVerified: user.emailVerified !== false,
     role: user.role,
     lastLoginAt: user.lastLoginAt,
     profile
@@ -57,11 +58,11 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ message: "Invalid or expired token." });
     }
 
-    const user = await User.findById(payload.sub);
+    let user = await User.findById(payload.sub);
     if (!user) {
       return res.status(401).json({ message: "User not found." });
     }
-    await ensureBrokerCodeForUser(user);
+    user = await ensureBrokerCodeForUser(user);
 
     req.authUser = user;
     return next();

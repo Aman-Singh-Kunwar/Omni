@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { BadgeCheck, Clock3, Filter, Headset, Home, Search, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Clock3, Headset, Home, ShieldCheck } from "lucide-react";
 import { careCategories } from "../../components/customer-dashboard/careCategoriesData";
 import omniLogo from "../../assets/images/omni-logo.png";
 import api from "../../api";
@@ -37,7 +37,6 @@ function CategoryDetailsPage() {
   const { slug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
   const [advisorStatus, setAdvisorStatus] = useState({ loading: false, error: "" });
   const [advisorToast, setAdvisorToast] = useState("");
@@ -59,26 +58,7 @@ function CategoryDetailsPage() {
     return <CategoryNotFound />;
   }
 
-  const normalizedCategoryQuery = categorySearchQuery.trim().toLowerCase();
-  const filteredServices = categoryData.services.filter((service) => {
-    if (!normalizedCategoryQuery) {
-      return true;
-    }
-
-    const searchableText = [
-      service.title,
-      service.description,
-      service.idealFor,
-      service.duration,
-      ...(Array.isArray(service.includes) ? service.includes : []),
-      ...(Array.isArray(service.process) ? service.process : []),
-      ...(Array.isArray(service.tools) ? service.tools : [])
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return searchableText.includes(normalizedCategoryQuery);
-  });
+  const filteredServices = categoryData.services;
 
   const advisorThemeByCategory = {
     "home-care": {
@@ -187,11 +167,12 @@ function CategoryDetailsPage() {
 
   return (
     <div className={`min-h-screen ${categoryData.backgroundClass || "bg-stone-100"}`}>
-      <section className="relative min-h-[70vh] overflow-hidden">
+      <section className="relative min-h-[70vh] overflow-hidden lg:min-h-[82vh] xl:min-h-[86vh]">
         <img
           src={categoryData.heroImage}
           alt={categoryData.title}
           className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: categoryData.heroImagePosition || "center center" }}
         />
         <div className={`absolute inset-0 bg-gradient-to-b ${categoryData.heroOverlayClass || "from-black/55 via-black/30 to-black/15"}`} />
         <div className="absolute left-6 top-6 z-10 flex items-center gap-3 px-1 py-1">
@@ -210,7 +191,7 @@ function CategoryDetailsPage() {
           <Home className="h-5 w-5" />
         </button>
 
-        <div className="relative mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-6 text-center lg:px-8">
+        <div className="relative mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-6 text-center lg:min-h-[82vh] lg:px-8 xl:min-h-[86vh]">
           <div className={`max-w-3xl space-y-4 ${categoryData.heroTextClass || "text-white"} animate-[fadeIn_600ms_ease-out_forwards]`}>
             <p className="text-xs uppercase tracking-[0.35em] text-white/85">Omni Care</p>
             <h1 className="text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">{categoryData.title}</h1>
@@ -224,21 +205,6 @@ function CategoryDetailsPage() {
           <div className="mb-10 max-w-2xl space-y-3">
             <h2 className="text-3xl font-semibold text-gray-800">Curated Services</h2>
             <p className="text-gray-500">Thoughtfully selected options for a calm, managed home routine.</p>
-          </div>
-          <div className="mb-8 rounded-2xl border border-gray-200 bg-white/70 p-4 shadow-sm transition-all duration-200 hover:shadow-md">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={`Search ${categoryData.title.toLowerCase()} services...`}
-                value={categorySearchQuery}
-                onChange={(event) => setCategorySearchQuery(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white/80 py-3 pl-12 pr-12 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              />
-              <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-800">
-                <Filter className="h-5 w-5" />
-              </button>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -267,9 +233,6 @@ function CategoryDetailsPage() {
               </article>
             ))}
           </div>
-          {!filteredServices.length && (
-            <p className="mt-8 text-gray-500">No services match "{categorySearchQuery.trim()}".</p>
-          )}
         </div>
       </section>
 

@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
 import LocationPickerModal from "../../components/LocationPickerModal";
 
+function toAvatarUrl(name) {
+  const encodedName = encodeURIComponent(String(name || "Worker"));
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=e5e7eb&color=374151&size=128`;
+}
+
 function parseTimeParts(timeValue) {
   const raw = String(timeValue || "").trim();
   if (!raw) {
@@ -228,9 +233,18 @@ function CustomerBookingFormPage({
         ) : (
           <>
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-              <p className="font-semibold text-gray-900">{selectedWorkerDetails?.name || "Worker not found"}</p>
-              {selectedWorkerDetails?.phone && <p>Phone: {selectedWorkerDetails.phone}</p>}
-              {selectedWorkerDetails?.email && <p>Email: {selectedWorkerDetails.email}</p>}
+              <div className="flex items-center gap-3">
+                <img
+                  src={selectedWorkerDetails?.photoUrl || toAvatarUrl(selectedWorkerDetails?.name)}
+                  alt={selectedWorkerDetails?.name || "Worker"}
+                  className="h-12 w-12 rounded-full border border-gray-200 bg-white object-cover"
+                />
+                <div>
+                  <p className="font-semibold text-gray-900">{selectedWorkerDetails?.name || "Worker not found"}</p>
+                  {selectedWorkerDetails?.phone && <p>Phone: {selectedWorkerDetails.phone}</p>}
+                  {selectedWorkerDetails?.email && <p>Email: {selectedWorkerDetails.email}</p>}
+                </div>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Choose Service</label>

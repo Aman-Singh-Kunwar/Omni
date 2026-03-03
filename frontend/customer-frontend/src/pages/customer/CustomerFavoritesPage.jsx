@@ -2,7 +2,12 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Heart } from "lucide-react";
 
-function CustomerFavoritesPage({ favoriteProviders, renderStars, onToggleFavorite, onBookProvider }) {
+function toAvatarUrl(name) {
+  const encodedName = encodeURIComponent(String(name || "Worker"));
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=e5e7eb&color=374151&size=160`;
+}
+
+function CustomerFavoritesPage({ favoriteProviders, renderStars, onToggleFavorite, onBookProvider, onViewWorkerProfile }) {
   const navigate = useNavigate();
   const handleBackClick = () => {
     if (window.history.length > 1) {
@@ -30,11 +35,19 @@ function CustomerFavoritesPage({ favoriteProviders, renderStars, onToggleFavorit
           <div key={provider.id} className="border p-6 rounded-lg bg-white/60">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-base font-semibold text-gray-700 shrink-0">
-                  {provider.image}
-                </div>
+                <img
+                  src={provider.photoUrl || toAvatarUrl(provider.name)}
+                  alt={provider.name}
+                  className="h-16 w-16 shrink-0 rounded-full border border-gray-200 bg-gray-100 object-cover"
+                />
                 <div>
-                  <h4 className="font-semibold text-gray-900">{provider.name}</h4>
+                  <button
+                    type="button"
+                    onClick={() => onViewWorkerProfile?.(provider)}
+                    className="text-left font-semibold text-gray-900 hover:text-blue-700"
+                  >
+                    {provider.name}
+                  </button>
                   <p className="text-sm text-gray-600">
                     {Array.isArray(provider.servicesProvided) && provider.servicesProvided.length
                       ? provider.servicesProvided.join(", ")
@@ -55,7 +68,14 @@ function CustomerFavoritesPage({ favoriteProviders, renderStars, onToggleFavorit
                 <Heart className="w-5 h-5 text-red-500 fill-current" />
               </button>
             </div>
-            <div className="flex mt-4">
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onViewWorkerProfile?.(provider)}
+                className="w-full rounded-lg border border-blue-200 bg-blue-50 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                View Job Profile
+              </button>
               <button
                 type="button"
                 onClick={() => onBookProvider(provider)}

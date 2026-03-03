@@ -31,11 +31,10 @@ function toSessionPayload(session) {
 function parseStoredSession(raw) {
   try {
     const parsed = JSON.parse(raw || "null");
-    if (parsed?.user) {
-      return parsed;
-    }
-    if (parsed?.id) {
-      return { user: parsed, token: "" };
+    const user = parsed?.user && typeof parsed.user === "object" ? parsed.user : null;
+    const token = typeof parsed?.token === "string" ? parsed.token.trim() : "";
+    if (user && token) {
+      return { user, token };
     }
     return null;
   } catch (_error) {
@@ -43,17 +42,41 @@ function parseStoredSession(raw) {
   }
 }
 
+function getBrowserStorage(type) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window[type];
+  } catch (_error) {
+    return null;
+  }
+}
+
 function getSessionFromStorage(storage) {
-  return parseStoredSession(storage.getItem(sessionKey));
+  if (!storage) {
+    return null;
+  }
+  const raw = storage.getItem(sessionKey);
+  const parsed = parseStoredSession(raw);
+  if (!parsed && raw) {
+    try {
+      storage.removeItem(sessionKey);
+    } catch (_error) {
+      // Ignore storage cleanup failures.
+    }
+  }
+  return parsed;
 }
 
 function getStoredSession() {
-  const sessionSession = getSessionFromStorage(window.sessionStorage);
+  const sessionSession = getSessionFromStorage(getBrowserStorage("sessionStorage"));
   if (sessionSession) {
     return { ...sessionSession, rememberMe: false };
   }
 
-  const localSession = getSessionFromStorage(window.localStorage);
+  const localSession = getSessionFromStorage(getBrowserStorage("localStorage"));
   if (localSession) {
     return { ...localSession, rememberMe: true };
   }
@@ -67,15 +90,24 @@ function storeSession(session, rememberMe = false) {
     return;
   }
 
-  const targetStorage = rememberMe ? window.localStorage : window.sessionStorage;
-  const secondaryStorage = rememberMe ? window.sessionStorage : window.localStorage;
-  targetStorage.setItem(sessionKey, JSON.stringify(payload));
-  secondaryStorage.removeItem(sessionKey);
+  const targetStorage = rememberMe ? getBrowserStorage("localStorage") : getBrowserStorage("sessionStorage");
+  const secondaryStorage = rememberMe ? getBrowserStorage("sessionStorage") : getBrowserStorage("localStorage");
+
+  try {
+    targetStorage?.setItem(sessionKey, JSON.stringify(payload));
+    secondaryStorage?.removeItem(sessionKey);
+  } catch (_error) {
+    // Ignore storage failures in restricted browsing contexts.
+  }
 }
 
 function clearSession() {
-  window.localStorage.removeItem(sessionKey);
-  window.sessionStorage.removeItem(sessionKey);
+  try {
+    getBrowserStorage("localStorage")?.removeItem(sessionKey);
+    getBrowserStorage("sessionStorage")?.removeItem(sessionKey);
+  } catch (_error) {
+    // Ignore storage failures in restricted browsing contexts.
+  }
 }
 
 function parseRememberParam(raw) {
@@ -111,10 +143,14 @@ function App() {
   const [authSession, setAuthSession] = useState(() => getStoredSession());
   const [checking, setChecking] = useState(true);
   const authUser = authSession?.user || null;
-  const authToken = authSession?.token || "";
+  const authToken = String(authSession?.token || "").trim();
+  const isAuthenticated = Boolean(authUser && authToken);
   const navigate = useNavigate();
   const location = useLocation();
-  const dashboardPaths = useMemo(() => ["/", "/workers", "/bookings", "/earnings", "/profile", "/settings"], []);
+  const dashboardPaths = useMemo(
+    () => ["/", "/workers", "/worker-profile", "/bookings", "/earnings", "/profile", "/settings"],
+    []
+  );
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -124,22 +160,49 @@ function App() {
     const bootstrapAuth = async () => {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get("authToken");
-      if (!urlToken) {
+      const verifyToken = async (token) =>
+        api.get("/auth/me", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+      if (urlToken) {
+        const rememberFromQuery = parseRememberParam(params.get("remember"));
+        const shouldRemember = rememberFromQuery ?? true;
+
+        try {
+          const response = await verifyToken(urlToken);
+          const user = response.data?.user;
+          if (user?.role === role) {
+            const nextSession = { user, token: urlToken, rememberMe: shouldRemember };
+            storeSession(nextSession, shouldRemember);
+            setAuthSession(nextSession);
+          } else {
+            clearSession();
+            setAuthSession(null);
+          }
+        } catch (_error) {
+          clearSession();
+          setAuthSession(null);
+        } finally {
+          cleanAuthTokenFromUrl();
+          setChecking(false);
+        }
+        return;
+      }
+
+      const storedSession = getStoredSession();
+      if (!storedSession?.token) {
+        clearSession();
+        setAuthSession(null);
         setChecking(false);
         return;
       }
-      const rememberFromQuery = parseRememberParam(params.get("remember"));
-      const shouldRemember = rememberFromQuery ?? true;
 
       try {
-        const response = await api.get("/auth/me", {
-          headers: { Authorization: `Bearer ${urlToken}` }
-        });
+        const response = await verifyToken(storedSession.token);
         const user = response.data?.user;
         if (user?.role === role) {
-          const nextSession = { user, token: urlToken, rememberMe: shouldRemember };
-          storeSession(nextSession, shouldRemember);
-          setAuthSession(nextSession);
+          setAuthSession({ ...storedSession, user });
         } else {
           clearSession();
           setAuthSession(null);
@@ -148,7 +211,6 @@ function App() {
         clearSession();
         setAuthSession(null);
       } finally {
-        cleanAuthTokenFromUrl();
         setChecking(false);
       }
     };
@@ -157,7 +219,7 @@ function App() {
   }, []);
 
   const handleGuestInteraction = (event) => {
-    if (authUser) {
+    if (isAuthenticated) {
       return;
     }
 
@@ -219,7 +281,7 @@ function App() {
         <Route
           path="/login"
           element={
-            authUser ? (
+            isAuthenticated ? (
               <Navigate to="/" replace />
             ) : (
               <BrokerAuthPage mode="login" onSuccess={handleAuthSuccess} />
@@ -229,7 +291,7 @@ function App() {
         <Route
           path="/signup"
           element={
-            authUser ? (
+            isAuthenticated ? (
               <Navigate to="/" replace />
             ) : (
               <BrokerAuthPage mode="signup" onSuccess={handleAuthSuccess} />
@@ -242,13 +304,14 @@ function App() {
             key={path}
             path={path}
             element={
-              authUser || path === "/" ? (
+              isAuthenticated || path === "/" ? (
                 <div onClickCapture={handleGuestInteraction}>
                   <BrokerDashboard
                     customerUrl={customerUrl}
                     workerUrl={workerUrl}
-                    userName={authUser?.name || "Guest Broker"}
-                    userEmail={authUser?.email || ""}
+                    userName={isAuthenticated ? authUser?.name || "Broker" : "Guest Broker"}
+                    userEmail={isAuthenticated ? authUser?.email || "" : ""}
+                    userPhotoUrl={isAuthenticated ? authUser?.profile?.photoUrl || "" : ""}
                     authToken={authToken}
                     onLogout={handleLogout}
                   />

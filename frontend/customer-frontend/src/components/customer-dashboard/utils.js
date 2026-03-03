@@ -27,6 +27,7 @@ function toFavoriteProvider(provider = {}) {
   const service = String(provider.service || servicesProvided[0] || "General Service").trim() || "General Service";
   const numericRating = Number(provider.rating || 0);
   const numericReviews = Number(provider.reviews || 0);
+  const photoUrl = String(provider.photoUrl || "").trim();
   const fallbackImage = name
     .split(" ")
     .map((chunk) => chunk[0])
@@ -41,6 +42,7 @@ function toFavoriteProvider(provider = {}) {
     servicesProvided,
     rating: Number.isFinite(numericRating) ? numericRating : 0,
     reviews: Number.isFinite(numericReviews) ? numericReviews : 0,
+    photoUrl,
     image: String(provider.image || fallbackImage || "W")
       .slice(0, 2)
       .toUpperCase()

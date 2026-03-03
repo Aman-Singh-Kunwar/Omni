@@ -24,8 +24,6 @@ import {
   buildPasswordResetSuccessEmail
 } from "./emailTemplates.js";
 
-// ── OTP / verification constants ──────────────────────────────────────────────
-
 const SIGNUP_VERIFICATION_CODE_LENGTH    = 6;
 const SIGNUP_VERIFICATION_EXPIRY_MINUTES = Math.max(1, Number(process.env.SIGNUP_VERIFICATION_EXPIRY_MINUTES || 10));
 const SIGNUP_VERIFICATION_MAX_ATTEMPTS   = 5;
@@ -40,8 +38,6 @@ const FORGOT_PASSWORD_SECRET         = String(
   process.env.FORGOT_PASSWORD_SECRET || process.env.SIGNUP_VERIFICATION_SECRET || process.env.JWT_SECRET || "omni-forgot-password-secret"
 ).trim();
 
-// ── normalizers ───────────────────────────────────────────────────────────────
-
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -55,8 +51,6 @@ function normalizeVerificationCode(value) {
     .replace(/\s+/g, "")
     .trim();
 }
-
-// ── OTP generators ────────────────────────────────────────────────────────────
 
 function generateVerificationCode() {
   let code = "";
@@ -74,8 +68,6 @@ function generateForgotPasswordCode() {
   return code;
 }
 
-// ── OTP hashers ───────────────────────────────────────────────────────────────
-
 function hashVerificationCode({ email, role, code }) {
   return crypto
     .createHash("sha256")
@@ -90,14 +82,10 @@ function hashForgotPasswordCode({ email, role, code }) {
     .digest("hex");
 }
 
-// ── expiry helpers ────────────────────────────────────────────────────────────
-
 function getVerificationExpiryDate()         { return new Date(Date.now() + SIGNUP_VERIFICATION_EXPIRY_MINUTES * 60 * 1000); }
 function isVerificationExpired(expiresAt)     { return !expiresAt || new Date(expiresAt).getTime() <= Date.now(); }
 function getForgotPasswordExpiryDate()        { return new Date(Date.now() + FORGOT_PASSWORD_EXPIRY_MINUTES  * 60 * 1000); }
 function isForgotPasswordExpired(expiresAt)   { return !expiresAt || new Date(expiresAt).getTime() <= Date.now(); }
-
-// ── user creation / restore ───────────────────────────────────────────────────
 
 async function createOrRestoreUserFromPendingSignup(pendingSignup) {
   const email                = normalizeEmail(pendingSignup?.email);
@@ -124,6 +112,7 @@ async function createOrRestoreUserFromPendingSignup(pendingSignup) {
   if (existing) {
     existing.name                = pendingSignup.name;
     existing.passwordHash        = pendingSignup.passwordHash;
+    existing.emailVerified       = true;
     existing.deletedCredentialsAt = null;
     existing.lastLoginAt         = new Date();
 
@@ -146,6 +135,7 @@ async function createOrRestoreUserFromPendingSignup(pendingSignup) {
   const payload = {
     name:         pendingSignup.name,
     email,
+    emailVerified: true,
     passwordHash: pendingSignup.passwordHash,
     role
   };
@@ -161,8 +151,6 @@ async function createOrRestoreUserFromPendingSignup(pendingSignup) {
   await syncUserFamilyByEmail(user);
   return { user, restoredCredentials: false };
 }
-
-// ── barrel re-export (all callers import only from this file) ─────────────────
 
 export {
   PendingSignup,

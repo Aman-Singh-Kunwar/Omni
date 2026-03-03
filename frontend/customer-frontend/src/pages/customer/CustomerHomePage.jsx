@@ -1,8 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Filter, Package, CheckCircle, Clock, CreditCard, Heart } from "lucide-react";
 import CustomerHeroSection from "../../components/customer-dashboard/CustomerHeroSection";
 import CareCategoriesSection from "../../components/customer-dashboard/CareCategoriesSection";
 
+function toAvatarUrl(name) {
+  const encodedName = encodeURIComponent(String(name || "Worker"));
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=e5e7eb&color=374151&size=160`;
+}
 
 function CustomerHomePage({
   userName,
@@ -13,21 +18,23 @@ function CustomerHomePage({
   favoriteWorkerIds,
   workersLoading,
   renderStars,
-  handleProviderBook,
+  onViewWorkerProfile,
   onToggleFavorite
 }) {
   const MOBILE_BREAKPOINT_PX = 640;
   const MOBILE_WORKERS_BATCH_SIZE = 2;
   const DEFAULT_WORKERS_BATCH_SIZE = 3;
+  const navigate = useNavigate();
   const [isMobileView, setIsMobileView] = useState(
     () => (typeof window !== "undefined" ? window.innerWidth < MOBILE_BREAKPOINT_PX : false)
   );
   const [visibleProvidersCount, setVisibleProvidersCount] = useState(DEFAULT_WORKERS_BATCH_SIZE);
-  const homeNeedsSectionRef = useRef(null);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const handleExploreCareClick = () => {
-    homeNeedsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const handleExploreCareClick = (categorySlug = "") => {
+    const normalizedSlug = String(categorySlug || "").trim().toLowerCase();
+    const targetSlug = normalizedSlug || "home-care";
+    navigate(`/customer/category/${targetSlug}`);
   };
 
   useEffect(() => {
@@ -54,10 +61,9 @@ function CustomerHomePage({
     }
     return featuredProviders.filter(
       (provider) =>
-        provider.name.toLowerCase().includes(normalizedQuery) ||
         provider.service.toLowerCase().includes(normalizedQuery) ||
         (Array.isArray(provider.servicesProvided)
-          ? provider.servicesProvided.some((service) => service.toLowerCase().includes(normalizedQuery))
+          ? provider.servicesProvided.some((serviceTitle) => serviceTitle.toLowerCase().includes(normalizedQuery))
           : false)
     );
   }, [featuredProviders, normalizedQuery]);
@@ -117,7 +123,7 @@ function CustomerHomePage({
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search for services like 'Plumber' or 'AC Repair'..."
+              placeholder="Search by service title, e.g. House Cleaning, Car Service..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
@@ -127,7 +133,7 @@ function CustomerHomePage({
             </button>
           </div>
         </div>
-        <div ref={homeNeedsSectionRef}>
+        <div>
           <CareCategoriesSection searchQuery={searchQuery} />
         </div>
 
@@ -135,14 +141,28 @@ function CustomerHomePage({
           <h3 className="text-xl font-bold text-gray-900 mb-6">Currently Available Workers</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {visibleProviders.map((provider) => (
-              <div key={provider.id} className="bg-white/80 p-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border border-gray-200">
+              <div
+                key={provider.id}
+                onClick={() => onViewWorkerProfile?.(provider)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onViewWorkerProfile?.(provider);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="bg-white/80 p-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border border-gray-200 text-left"
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex min-w-0 items-center space-x-3 sm:space-x-4">
-                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-base font-semibold text-gray-700">
-                      {provider.image}
-                    </div>
+                    <img
+                      src={provider.photoUrl || toAvatarUrl(provider.name)}
+                      alt={provider.name}
+                      className="h-16 w-16 rounded-full border border-gray-200 bg-gray-100 object-cover"
+                    />
                     <div>
-                      <h4 className="font-semibold text-gray-900 break-words">{provider.name}</h4>
+                      <p className="font-semibold text-gray-900 break-words">{provider.name}</p>
                       <p className="text-sm text-gray-600">
                         {Array.isArray(provider.servicesProvided) && provider.servicesProvided.length
                           ? provider.servicesProvided.join(", ")
@@ -152,7 +172,10 @@ function CustomerHomePage({
                   </div>
                   <button
                     type="button"
-                    onClick={() => onToggleFavorite(provider.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleFavorite(provider.id);
+                    }}
                     aria-label={
                       favoriteWorkerIds.includes(String(provider.id || ""))
                         ? `Remove ${provider.name} from favorites`
@@ -176,12 +199,7 @@ function CustomerHomePage({
                   </div>
                   <span className="font-semibold text-blue-600">Available</span>
                 </div>
-                <button
-                  onClick={() => handleProviderBook(provider)}
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Book Now
-                </button>
+                <p className="text-sm font-medium text-blue-700">Tap to view job profile</p>
               </div>
             ))}
             {!workersLoading && !filteredProviders.length && !normalizedQuery && (

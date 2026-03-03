@@ -2,7 +2,18 @@
 
 ## Shared UX + Platform Features
 
+### Architecture
+
 - Role-based monorepo with 4 frontends: landing, customer, worker, broker.
+- Shared utilities in `frontend/shared/` for code reuse across all apps:
+  - `useSessionManagement.js` hook for consistent auth/session handling
+  - `LoadingScreen.jsx` component for uniform loading states
+  - `appConfig.js` for centralized configuration management
+  - `responsive.js` for mobile-first design patterns
+  - `mapUtils.js` for location and routing utilities
+
+### Authentication & Session
+
 - Token handoff flow (`?authToken=...`) from landing to role apps with `/auth/me` validation.
 - Per-role session persistence (`customer`, `worker`, `broker`) with `Remember me` support:
   - checked: persistent login (`localStorage`)
@@ -20,6 +31,7 @@
 - Browser favicon uses Omni logo across landing and all role apps.
 - Loading screens show animated Omni logo spinner (spinning ring + logo centered) with message text instead of plain text placeholders.
 - Shared map utility library (`@shared/utils/mapUtils`) centralises Haversine distance, ETA formatting, OSRM route fetching, and Nominatim geocoding used by both live-tracking modals — eliminating duplication between customer and worker frontends.
+- Session management consolidated in `useSessionManagement.js` hook - reduces App.jsx complexity and ensures consistent auth behavior across all role apps.
 
 ## Landing Frontend
 

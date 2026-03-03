@@ -26,7 +26,10 @@ router.get("/worker/reviews", async (req, res, next) => {
       ...workerFilter,
       status: { $in: ["completed", "not-provided"] },
       rating: { $gt: 0 },
-      feedback: { $exists: true, $ne: "" }
+      $or: [
+        { feedback: { $exists: true, $ne: "" } },
+        { "feedbackMedia.0": { $exists: true } }
+      ]
     })
       .select({ chatMessages: 0 })
       .sort({ updatedAt: -1, createdAt: -1 })
@@ -38,6 +41,15 @@ router.get("/worker/reviews", async (req, res, next) => {
       service: booking.service || "Service",
       rating: typeof booking.rating === "number" ? booking.rating : 0,
       feedback: String(booking.feedback || ""),
+      feedbackMedia: Array.isArray(booking.feedbackMedia)
+        ? booking.feedbackMedia
+            .map((media) => ({
+              kind: media?.kind === "video" ? "video" : "image",
+              mimeType: String(media?.mimeType || ""),
+              dataUrl: String(media?.dataUrl || "")
+            }))
+            .filter((media) => media.dataUrl)
+        : [],
       amount: Number(booking.amount || 0),
       date: booking.date || "",
       time: booking.time || "",

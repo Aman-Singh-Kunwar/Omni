@@ -41,21 +41,15 @@ async function getAvailableWorkers(limit = 0) {
     role: "worker",
     $or: [{ "workerProfile.isAvailable": true }, { "workerProfile.isAvailable": { $exists: false } }]
   })
-    .select({ name: 1, email: 1, workerProfile: 1, updatedAt: 1, createdAt: 1 })
+    .select({ name: 1, email: 1, workerProfile: 1, brokerProfile: 1, customerProfile: 1, updatedAt: 1, createdAt: 1 })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();
-
-  if (limit > 0) {
-    query.limit(limit);
-  }
 
   const workers = await query;
   if (!workers.length) {
     return [];
   }
 
-  // Limit booking scan to the last 365 days — avoids a full-collection scan
-  // while still capturing all practically relevant completed-job history.
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const workerNames = workers.map((worker) => worker.name);
   const bookings = await Booking.find({
@@ -66,7 +60,20 @@ async function getAvailableWorkers(limit = 0) {
     .lean();
 
   const summaryByName = buildWorkerBookingSummary(bookings);
-  return workers.map((worker) => toAvailableWorkerDto(worker, summaryByName.get(worker.name)));
+  const rankedWorkers = workers
+    .map((worker) => toAvailableWorkerDto(worker, summaryByName.get(worker.name)))
+    .sort(
+      (left, right) =>
+        Number(right.averageRating || 0) - Number(left.averageRating || 0) ||
+        Number(right.completedJobs || 0) - Number(left.completedJobs || 0) ||
+        String(left.name || "").localeCompare(String(right.name || ""))
+    );
+
+  if (limit > 0) {
+    return rankedWorkers.slice(0, limit);
+  }
+
+  return rankedWorkers;
 }
 
 function workerProvidesService(worker, service) {

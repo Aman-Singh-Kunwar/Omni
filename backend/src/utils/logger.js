@@ -64,6 +64,9 @@ const logger = {
   error(message, meta) {
     write("error", message, meta);
   },
+  debugOnce(key, message, meta) {
+    write("debug", message, meta, { onceKey: key });
+  },
   infoOnce(key, message, meta) {
     write("info", message, meta, { onceKey: key });
   },

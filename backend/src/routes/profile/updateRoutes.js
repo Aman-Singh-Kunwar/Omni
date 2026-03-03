@@ -1,12 +1,9 @@
 import express from "express";
 import {
   PROFILE_PATH_BY_ROLE,
-  User,
   buildProfileUpdate,
   enrichWorkerProfile,
-  ensureEmailCanMoveForFamily,
   getWorkerBrokerCommissionProgress,
-  isGmailAddress,
   logger,
   requireAuth,
   safeNormalizeBrokerCode,
@@ -29,34 +26,11 @@ router.put("/profile", requireAuth, async (req, res, next) => {
     }
 
     if (email && email !== req.authUser.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        logger.warn("Profile update failed: invalid email format", {
-          userId: String(req.authUser._id),
-          role: req.authUser.role
-        });
-        return res.status(400).json({ message: "Invalid email format." });
-      }
-      if (!isGmailAddress(email)) {
-        logger.warn("Profile update failed: non-gmail email", {
-          userId: String(req.authUser._id),
-          role: req.authUser.role
-        });
-        return res.status(400).json({ message: "Only @gmail.com email addresses are allowed." });
-      }
-
-      const existing = await User.findOne({ email, role: req.authUser.role }).select({ _id: 1 }).lean();
-      if (existing && String(existing._id) !== String(req.authUser._id)) {
-        logger.warn("Profile update failed: email conflict", {
-          userId: String(req.authUser._id),
-          role: req.authUser.role
-        });
-        return res.status(409).json({ message: "Email already registered for this role." });
-      }
-
-      await ensureEmailCanMoveForFamily(req.authUser, email);
-
-      req.authUser.email = email;
+      logger.warn("Profile update failed: direct email change blocked", {
+        userId: String(req.authUser._id),
+        role: req.authUser.role
+      });
+      return res.status(409).json({ message: "Use email verification to update your email address." });
     }
 
     const roleProfilePath = PROFILE_PATH_BY_ROLE[req.authUser.role];

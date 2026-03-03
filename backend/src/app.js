@@ -235,7 +235,7 @@ function isDatabaseConnectivityError(error) {
 }
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
 app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   const method = req.method || "UNKNOWN";
@@ -244,6 +244,11 @@ app.use((req, res, next) => {
     if (payload && typeof payload === "object" && typeof payload.message === "string" && payload.message.trim()) {
       const path = req.originalUrl || req.url;
       const statusCode = res.statusCode || 200;
+      const isAuthError = statusCode === 401 && (
+        payload.message.includes("token") || 
+        payload.message.includes("auth") ||
+        payload.message.includes("Unauthorized")
+      );
       const meta = {
         path,
         statusCode,
@@ -253,8 +258,10 @@ app.use((req, res, next) => {
 
       if (statusCode >= 500) {
         logger.errorOnce(onceKey, "Notification sent to frontend", meta);
-      } else if (statusCode >= 400) {
+      } else if (statusCode >= 400 && !isAuthError) {
         logger.warnOnce(onceKey, "Notification sent to frontend", meta);
+      } else if (isAuthError) {
+        logger.debugOnce(onceKey, "Auth token validation failed", meta);
       } else {
         logger.infoOnce(onceKey, "Notification sent to frontend", meta);
       }
@@ -266,7 +273,7 @@ app.use((req, res, next) => {
           statusCode,
           message: payload.message
         });
-      } else if (statusCode >= 400) {
+      } else if (statusCode >= 400 && !isAuthError) {
         logger.warnOnce(`api_warn:${method}:${path}:${statusCode}:${payload.message}`, "API request warning", {
           method,
           path,

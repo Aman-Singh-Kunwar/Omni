@@ -44,6 +44,7 @@ router.post("/auth/switch-role", requireAuth, async (req, res, next) => {
       const createPayload = {
         name: req.authUser.name,
         email: req.authUser.email,
+        emailVerified: req.authUser.emailVerified !== false,
         passwordHash: req.authUser.passwordHash,
         role: targetRole
       };

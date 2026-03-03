@@ -49,8 +49,6 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
   useAutoDismissStatus(status, setStatus);
   useAutoDismissStatus(forgotPasswordStatus, setForgotPasswordStatus);
 
-  // Suppress transition on first render to prevent the panel from animating
-  // in then out during the initial paint when mobileRolePanelOpen is false.
   useEffect(() => { setPanelReady(true); }, []);
 
   useEffect(() => {
@@ -379,7 +377,6 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
 
-    // Ignore tiny drags and clear vertical scrolling gestures quickly.
     if (absY > 18 && absY > absX) {
       mobileRoleSwipeRef.current = { ...start, active: false };
       return;
@@ -389,7 +386,6 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
       return;
     }
 
-    // Open only for an intentional left swipe from the right edge trigger.
     if (deltaX <= -28 && absY < absX * 0.8) {
       mobileRoleSwipeRef.current = { ...start, active: false, opened: true };
       openRolePanel();
@@ -434,7 +430,6 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
 
-    // Ignore tiny drags and cancel on vertical scroll gestures.
     if (absY > 18 && absY > absX) {
       mobilePanelCloseSwipeRef.current = { ...start, active: false };
       return;
@@ -444,7 +439,6 @@ function AuthPage({ mode = "login", apiBase, customerUrl, workerUrl, brokerUrl }
       return;
     }
 
-    // Close only for an intentional right swipe inside the panel.
     if (deltaX >= 28 && absY < absX * 0.8) {
       mobilePanelCloseSwipeRef.current = { ...start, active: false, closed: true };
       setMobileRolePanelOpen(false);

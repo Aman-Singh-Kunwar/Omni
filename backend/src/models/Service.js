@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { SERVICE_NAMES } from "../config/serviceCatalog.js";
 function normalizeString(value) {
   if (typeof value !== "string") {
     return "";
@@ -8,7 +9,7 @@ function normalizeString(value) {
 
 const serviceSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true, maxlength: 120 },
+    name: { type: String, required: true, trim: true, maxlength: 120, enum: SERVICE_NAMES },
     category: { type: String, required: true, trim: true, maxlength: 120 },
     basePrice: { type: Number, required: true, min: 0 },
     rating: { type: Number, default: 0, min: 0, max: 5 },

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { normalizeServices as normalizeCatalogServices } from "../config/serviceCatalog.js";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
 const BROKER_CODE_LENGTH = 6;
@@ -19,10 +20,7 @@ function normalizeBrokerCode(value) {
 }
 
 function normalizeServicesProvided(services) {
-  if (!Array.isArray(services)) {
-    return [];
-  }
-  return [...new Set(services.map((item) => normalizeString(item)).filter(Boolean))];
+  return normalizeCatalogServices(services);
 }
 
 function toPlainProfile(profile = {}) {
@@ -40,6 +38,7 @@ function normalizeRoleProfileCommon(profile = {}) {
   const gender = normalizeString(next.gender).toLowerCase();
   next.bio = normalizeString(next.bio);
   next.phone = normalizeString(next.phone);
+  next.photoUrl = normalizeString(next.photoUrl);
   next.gender = ["male", "female", "prefer_not_to_say", "other"].includes(gender) ? gender : "";
   return next;
 }
@@ -78,7 +77,8 @@ const roleProfileBaseSchema = {
     default: ""
   },
   dateOfBirth: { type: Date },
-  phone: { type: String, trim: true, maxlength: 32, default: "" }
+  phone: { type: String, trim: true, maxlength: 32, default: "" },
+  photoUrl: { type: String, trim: true, maxlength: 3000000, default: "" }
 };
 
 const customerProfileSchema = new mongoose.Schema(roleProfileBaseSchema, { _id: false });
@@ -89,14 +89,13 @@ const brokerProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       uppercase: true,
-      minlength: 6,
-      maxlength: 6,
       validate: {
         validator(value) {
           if (value === undefined || value === null || value === "") {
             return true;
           }
-          return BROKER_CODE_REGEX.test(String(value).trim().toUpperCase());
+          const normalized = String(value).trim().toUpperCase();
+          return normalized.length === 6 && BROKER_CODE_REGEX.test(normalized);
         },
         message: "Broker code must be exactly 6 alphanumeric characters."
       }
@@ -155,6 +154,7 @@ const userSchema = new mongoose.Schema(
         message: "Invalid email format."
       }
     },
+    emailVerified: { type: Boolean, default: true },
     passwordHash: { type: String, required: true },
     role: { type: String, required: true, enum: ["customer", "broker", "worker"] },
     lastLoginAt: { type: Date },

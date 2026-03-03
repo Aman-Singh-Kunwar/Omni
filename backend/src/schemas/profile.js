@@ -1,6 +1,10 @@
+import { normalizeServices as normalizeCatalogServices } from "../config/serviceCatalog.js";
+
 const GENDER_VALUES = ["male", "female", "prefer_not_to_say", "other"];
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
 const PHONE_REGEX = /^\d{10,13}$/;
+const PROFILE_PHOTO_DATA_URL_REGEX = /^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i;
+const PROFILE_PHOTO_MAX_BYTES = 400 * 1024;
 
 const PROFILE_PATH_BY_ROLE = {
   customer: "customerProfile",
@@ -86,11 +90,7 @@ function validateDateOfBirthForRole(role, dateOfBirth) {
 }
 
 function normalizeServices(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return [...new Set(value.map(normalizeString).filter(Boolean))];
+  return normalizeCatalogServices(value);
 }
 
 function normalizeBrokerCode(value) {
@@ -112,18 +112,69 @@ function normalizeBrokerCode(value) {
   return normalized;
 }
 
+function estimateBase64Bytes(base64Payload = "") {
+  const normalized = String(base64Payload || "").replace(/\s+/g, "");
+  if (!normalized) {
+    return 0;
+  }
+
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((normalized.length * 3) / 4) - padding);
+}
+
+function normalizePhotoUrl(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return "";
+  }
+
+  if (!PROFILE_PHOTO_DATA_URL_REGEX.test(normalized)) {
+    const error = new Error("Profile photo must be a valid PNG/JPG/WEBP image.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const base64Part = normalized.split(",")[1] || "";
+  const estimatedBytes = estimateBase64Bytes(base64Part);
+  if (estimatedBytes > PROFILE_PHOTO_MAX_BYTES) {
+    const error = new Error("Profile photo must be 400KB or less after compression.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
 function pickRoleProfile(user) {
   const path = PROFILE_PATH_BY_ROLE[user.role];
   return user[path] || {};
 }
 
+function resolvePhotoUrlFromUser(user, preferredPath = "") {
+  const orderedPaths = [...new Set([preferredPath, "workerProfile", "brokerProfile", "customerProfile"].filter(Boolean))];
+  for (const path of orderedPaths) {
+    const profile = user?.[path] || {};
+    const photoUrl = normalizeString(profile?.photoUrl);
+    if (photoUrl) {
+      return photoUrl;
+    }
+  }
+  return "";
+}
+
 function toProfileDto(user) {
+  const profilePath = PROFILE_PATH_BY_ROLE[user.role];
   const roleProfile = pickRoleProfile(user);
   const commonProfile = {
     bio: roleProfile.bio || "",
     gender: roleProfile.gender || "",
     dateOfBirth: roleProfile.dateOfBirth || null,
-    phone: roleProfile.phone || ""
+    phone: roleProfile.phone || "",
+    photoUrl: resolvePhotoUrlFromUser(user, profilePath)
   };
 
   return {
@@ -131,6 +182,7 @@ function toProfileDto(user) {
       id: String(user._id),
       name: user.name,
       email: user.email,
+      emailVerified: user.emailVerified !== false,
       role: user.role
     },
     profile:
@@ -156,6 +208,9 @@ function buildProfileUpdate(role, payload = {}) {
     bio: normalizeString(payload.bio),
     phone: normalizePhone(payload.phone)
   };
+  if (Object.prototype.hasOwnProperty.call(payload, "photoUrl")) {
+    updates.photoUrl = normalizePhotoUrl(payload.photoUrl);
+  }
 
   const gender = normalizeGender(payload.gender);
   if (gender === null) {
@@ -199,6 +254,7 @@ function toAvailableWorkerDto(user, bookingSummary = { completedJobs: 0, average
     phone: workerProfile.phone || "",
     gender: workerProfile.gender || "",
     dateOfBirth: workerProfile.dateOfBirth || null,
+    photoUrl: resolvePhotoUrlFromUser(user, "workerProfile"),
     servicesProvided: Array.isArray(workerProfile.servicesProvided) ? workerProfile.servicesProvided : [],
     isAvailable: workerProfile.isAvailable !== false,
     completedJobs: bookingSummary.completedJobs,
@@ -211,5 +267,6 @@ export {
   toProfileDto,
   buildProfileUpdate,
   toAvailableWorkerDto,
+  resolvePhotoUrlFromUser,
   normalizeBrokerCode
 };

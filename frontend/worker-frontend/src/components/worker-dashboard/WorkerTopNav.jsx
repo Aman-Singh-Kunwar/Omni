@@ -25,8 +25,19 @@ function WorkerTopNav({
   setIsMobileMenuOpen,
   onOpenRoleSwitch,
   onLogout,
-  displayUserName
+  displayUserName,
+  profilePhotoUrl = ""
 }) {
+  const hasProfilePhoto = Boolean(String(profilePhotoUrl || "").trim());
+  const renderAvatar = () =>
+    hasProfilePhoto ? (
+      <img src={profilePhotoUrl} alt={`${displayUserName} profile`} className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+    ) : (
+      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+        <User className="w-4 h-4 text-white" />
+      </div>
+    );
+
   return (
     <nav ref={navRef} className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -140,9 +151,7 @@ function WorkerTopNav({
                 }}
                 className="hidden lg:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50/80"
               >
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+                {renderAvatar()}
                 <div className="text-sm text-left">
                   <p className="font-medium text-gray-900">{displayUserName}</p>
                   <p className="text-gray-500 text-xs">Service Provider</p>
@@ -159,9 +168,7 @@ function WorkerTopNav({
                 className="lg:hidden ui-touch-target p-2 text-gray-500 hover:text-gray-700"
                 aria-label="Open profile menu"
               >
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+                {renderAvatar()}
               </button>
 
               {showUserMenu && (

@@ -1,6 +1,3 @@
-// Shared map/routing utilities used by LiveTrackingModal and CustomerLocationModal.
-// Keep this file free of React/Leaflet imports so it can be tested in isolation.
-
 /**
  * Haversine great-circle distance between two {lat, lng} points, in kilometres.
  */
@@ -76,7 +73,6 @@ export async function fetchOsrmRoute(from, to, signal) {
   const coords = data?.routes?.[0]?.geometry?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2) return null;
   const durationSeconds = data?.routes?.[0]?.duration ?? null;
-  // OSRM returns [lng, lat]; Leaflet expects [lat, lng]
   return { coords: coords.map(([lng, lat]) => [lat, lng]), durationSeconds };
 }
 
@@ -131,13 +127,10 @@ export async function fetchGeocode(addressText) {
     const parts = addressText.split(",").map((s) => s.trim()).filter(Boolean);
     const queries = parts.map((_, i) => parts.slice(i).join(", "));
 
-    // Fire all queries in parallel — total wait = slowest single request,
-    // not the sum of all requests.
     const settled = await Promise.allSettled(
       queries.map((q, i) => _fetchSingleGeocode(q, i))
     );
 
-    // Collect successful, valid results and pick the most specific (lowest index).
     const best = settled
       .filter((r) => r.status === "fulfilled" && r.value !== null)
       .map((r) => r.value)

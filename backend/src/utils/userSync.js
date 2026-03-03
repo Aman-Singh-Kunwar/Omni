@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import { PROFILE_PATH_BY_ROLE } from "../schemas/profile.js";
 
-const COMMON_PROFILE_FIELDS = ["bio", "gender", "dateOfBirth", "phone"];
+const COMMON_PROFILE_FIELDS = ["bio", "gender", "dateOfBirth", "phone", "photoUrl"];
 
 function normalizeEmail(value) {
   return String(value || "")
@@ -24,7 +24,8 @@ function readCommonProfile(user) {
     bio: String(profile?.bio || "").trim(),
     gender: String(profile?.gender || "").trim(),
     dateOfBirth: profile?.dateOfBirth || null,
-    phone: String(profile?.phone || "").trim()
+    phone: String(profile?.phone || "").trim(),
+    photoUrl: String(profile?.photoUrl || "").trim()
   };
 }
 
@@ -77,7 +78,8 @@ function buildCanonicalCommonProfile(users = []) {
     bio: "",
     gender: "",
     dateOfBirth: null,
-    phone: ""
+    phone: "",
+    photoUrl: ""
   };
 
   for (const field of COMMON_PROFILE_FIELDS) {

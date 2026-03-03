@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 const BROKER_CODE_REGEX = /^[A-Z0-9]{6}$/;
 const DEFAULT_BROKER_COMMISSION_RATE = 5;
+const REVIEW_MEDIA_MAX_ITEMS = 4;
+const REVIEW_IMAGE_DATA_URL_REGEX = /^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i;
+const REVIEW_VIDEO_DATA_URL_REGEX = /^data:video\/(mp4|webm|ogg|quicktime);base64,[a-z0-9+/=\s]+$/i;
+const REVIEW_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+const REVIEW_VIDEO_MAX_BYTES = 8 * 1024 * 1024;
+const REVIEW_MEDIA_TOTAL_MAX_BYTES = 10 * 1024 * 1024;
 
 function normalizeString(value) {
   if (typeof value !== "string") {
@@ -40,6 +46,72 @@ function clampPercent(value) {
     return 100;
   }
   return numeric;
+}
+
+function estimateBase64Bytes(base64Payload = "") {
+  const normalized = String(base64Payload || "").replace(/\s+/g, "");
+  if (!normalized) {
+    return 0;
+  }
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((normalized.length * 3) / 4) - padding);
+}
+
+function buildReviewMediaValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+function normalizeFeedbackMedia(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const normalizedMedia = [];
+  const limitedItems = value.slice(0, REVIEW_MEDIA_MAX_ITEMS);
+  let totalBytes = 0;
+
+  limitedItems.forEach((item) => {
+    const dataUrl = normalizeString(item?.dataUrl);
+    if (!dataUrl) {
+      return;
+    }
+
+    let kind = "";
+    let maxBytes = 0;
+    if (REVIEW_IMAGE_DATA_URL_REGEX.test(dataUrl)) {
+      kind = "image";
+      maxBytes = REVIEW_IMAGE_MAX_BYTES;
+    } else if (REVIEW_VIDEO_DATA_URL_REGEX.test(dataUrl)) {
+      kind = "video";
+      maxBytes = REVIEW_VIDEO_MAX_BYTES;
+    } else {
+      throw buildReviewMediaValidationError("Review media must be PNG/JPG/WEBP/GIF image or MP4/WEBM/OGG/MOV video.");
+    }
+
+    const mimeMatch = dataUrl.match(/^data:([^;]+);base64,/i);
+    const mimeType = normalizeString(mimeMatch?.[1] || "");
+    const base64Part = dataUrl.split(",")[1] || "";
+    const mediaBytes = estimateBase64Bytes(base64Part);
+    if (mediaBytes > maxBytes) {
+      throw buildReviewMediaValidationError(
+        kind === "image" ? "Each review image must be 3MB or less." : "Each review video must be 8MB or less."
+      );
+    }
+    totalBytes += mediaBytes;
+    if (totalBytes > REVIEW_MEDIA_TOTAL_MAX_BYTES) {
+      throw buildReviewMediaValidationError("Total review media size must be 10MB or less.");
+    }
+
+    normalizedMedia.push({
+      kind,
+      mimeType,
+      dataUrl
+    });
+  });
+
+  return normalizedMedia;
 }
 
 function hasLinkedBroker(booking) {
@@ -112,6 +184,17 @@ const bookingSchema = new mongoose.Schema(
     discountAmount: { type: Number, min: 0, default: 0 },
     rating: { type: Number, min: 0, max: 5 },
     feedback: { type: String, default: "", trim: true, maxlength: 500 },
+    feedbackMedia: {
+      type: [
+        {
+          _id: false,
+          kind: { type: String, enum: ["image", "video"], required: true },
+          mimeType: { type: String, trim: true, default: "" },
+          dataUrl: { type: String, trim: true, required: true, maxlength: 18000000 }
+        }
+      ],
+      default: []
+    },
     hiddenForCustomer: { type: Boolean, default: false },
     hiddenForCustomerAt: { type: Date },
     chatMessages: {
@@ -144,6 +227,8 @@ bookingSchema.pre("validate", async function preValidateBooking() {
   this.brokerCode = normalizeBrokerCode(this.brokerCode);
   this.location = normalizeString(this.location);
   this.description = normalizeString(this.description);
+  this.feedback = normalizeString(this.feedback);
+  this.feedbackMedia = normalizeFeedbackMedia(this.feedbackMedia);
   this.date = normalizeString(this.date);
   this.time = normalizeString(this.time);
 

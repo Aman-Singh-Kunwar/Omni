@@ -93,15 +93,16 @@ router.patch("/customer/bookings/:bookingId/review", requireAuth, async (req, re
 
     const rating = Number(req.body?.rating);
     const feedback = String(req.body?.feedback || "").trim();
+    const feedbackMedia = Array.isArray(req.body?.feedbackMedia) ? req.body.feedbackMedia : [];
 
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Rating must be between 1 and 5." });
     }
-    if (!feedback) {
-      return res.status(400).json({ message: "Feedback message is required." });
-    }
     if (feedback.length > 500) {
       return res.status(400).json({ message: "Feedback cannot exceed 500 characters." });
+    }
+    if (!feedback && !feedbackMedia.length) {
+      return res.status(400).json({ message: "Add a feedback message or upload at least one image/video." });
     }
 
     const booking = await findCustomerBooking(req.authUser, bookingId);
@@ -117,6 +118,7 @@ router.patch("/customer/bookings/:bookingId/review", requireAuth, async (req, re
 
     booking.rating = rating;
     booking.feedback = feedback;
+    booking.feedbackMedia = feedbackMedia;
     await booking.save();
 
     emitBookingRealtimeEvent(booking, { action: "reviewed", audience: "all" });

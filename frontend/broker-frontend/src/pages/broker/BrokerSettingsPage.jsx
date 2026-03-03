@@ -203,45 +203,45 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
           </button>
         </div>
         <div className="space-y-6">
-        <div className="border rounded-lg p-6 bg-white/60">
-          <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
-          <NotificationSettingsSection
+          <div className="border rounded-lg p-6 bg-white/60">
+            <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
+            <NotificationSettingsSection
+              theme={BROKER_THEME}
+              showForm={showNotificationsForm}
+              setShowForm={toggleNotificationsForm}
+              settings={settings}
+              toggleSetting={toggleSetting}
+              status={notificationStatus}
+              setStatus={setNotificationStatus}
+              onSave={handleSaveNotificationSettings}
+              labels={{
+                jobRequests: "Get notified for new and updated booking requests.",
+                payments: "Get alerts when commission and payment updates happen.",
+                jobAlerts: "Receive alerts for active and completed jobs.",
+                reminders: "Receive reminders for pending broker actions."
+              }}
+            />
+          </div>
+
+          <AccountSettingsSection
             theme={BROKER_THEME}
-            showForm={showNotificationsForm}
-            setShowForm={toggleNotificationsForm}
-            settings={settings}
-            toggleSetting={toggleSetting}
-            status={notificationStatus}
-            setStatus={setNotificationStatus}
-            onSave={handleSaveNotificationSettings}
-            labels={{
-              jobRequests: "Get notified for new and updated booking requests.",
-              payments: "Get alerts when commission and payment updates happen.",
-              jobAlerts: "Receive alerts for active and completed jobs.",
-              reminders: "Receive reminders for pending broker actions."
-            }}
+            onLogout={handleLogoutClick}
+            showPasswordForm={showPasswordForm}
+            setShowPasswordForm={setShowPasswordForm}
+            passwordForm={passwordForm}
+            setPasswordForm={setPasswordForm}
+            passwordStatus={passwordStatus}
+            setPasswordStatus={setPasswordStatus}
+            onUpdatePassword={handleUpdatePassword}
+            showDeleteForm={showDeleteForm}
+            setShowDeleteForm={setShowDeleteForm}
+            deleteForm={deleteForm}
+            setDeleteForm={setDeleteForm}
+            deleteStatus={deleteStatus}
+            setDeleteStatus={setDeleteStatus}
+            onDeleteAccount={handleDeleteAccount}
           />
         </div>
-
-        <AccountSettingsSection
-          theme={BROKER_THEME}
-          onLogout={handleLogoutClick}
-          showPasswordForm={showPasswordForm}
-          setShowPasswordForm={setShowPasswordForm}
-          passwordForm={passwordForm}
-          setPasswordForm={setPasswordForm}
-          passwordStatus={passwordStatus}
-          setPasswordStatus={setPasswordStatus}
-          onUpdatePassword={handleUpdatePassword}
-          showDeleteForm={showDeleteForm}
-          setShowDeleteForm={setShowDeleteForm}
-          deleteForm={deleteForm}
-          setDeleteForm={setDeleteForm}
-          deleteStatus={deleteStatus}
-          setDeleteStatus={setDeleteStatus}
-          onDeleteAccount={handleDeleteAccount}
-        />
-      </div>
       </div>
     </div>
   );

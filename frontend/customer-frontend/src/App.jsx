@@ -59,17 +59,32 @@ function parseStoredSession(raw) {
   }
 }
 
+function getBrowserStorage(type) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window[type];
+  } catch (_error) {
+    return null;
+  }
+}
+
 function getSessionFromStorage(storage) {
+  if (!storage) {
+    return null;
+  }
   return parseStoredSession(storage.getItem(sessionKey));
 }
 
 function getStoredSession() {
-  const sessionSession = getSessionFromStorage(window.sessionStorage);
+  const sessionSession = getSessionFromStorage(getBrowserStorage("sessionStorage"));
   if (sessionSession) {
     return { ...sessionSession, rememberMe: false };
   }
 
-  const localSession = getSessionFromStorage(window.localStorage);
+  const localSession = getSessionFromStorage(getBrowserStorage("localStorage"));
   if (localSession) {
     return { ...localSession, rememberMe: true };
   }
@@ -83,15 +98,24 @@ function storeSession(session, rememberMe = false) {
     return;
   }
 
-  const targetStorage = rememberMe ? window.localStorage : window.sessionStorage;
-  const secondaryStorage = rememberMe ? window.sessionStorage : window.localStorage;
-  targetStorage.setItem(sessionKey, JSON.stringify(payload));
-  secondaryStorage.removeItem(sessionKey);
+  const targetStorage = rememberMe ? getBrowserStorage("localStorage") : getBrowserStorage("sessionStorage");
+  const secondaryStorage = rememberMe ? getBrowserStorage("sessionStorage") : getBrowserStorage("localStorage");
+
+  try {
+    targetStorage?.setItem(sessionKey, JSON.stringify(payload));
+    secondaryStorage?.removeItem(sessionKey);
+  } catch (_error) {
+    // Ignore storage failures in restricted browsing contexts.
+  }
 }
 
 function clearSession() {
-  window.localStorage.removeItem(sessionKey);
-  window.sessionStorage.removeItem(sessionKey);
+  try {
+    getBrowserStorage("localStorage")?.removeItem(sessionKey);
+    getBrowserStorage("sessionStorage")?.removeItem(sessionKey);
+  } catch (_error) {
+    // Ignore storage failures in restricted browsing contexts.
+  }
 }
 
 function parseRememberParam(raw) {
@@ -130,7 +154,10 @@ function App() {
   const authToken = authSession?.token || "";
   const navigate = useNavigate();
   const location = useLocation();
-  const dashboardPaths = useMemo(() => ["/", "/bookings/new", "/bookings", "/favorites", "/profile", "/settings"], []);
+  const dashboardPaths = useMemo(
+    () => ["/", "/bookings/new", "/bookings", "/favorites", "/worker-profile", "/profile", "/settings"],
+    []
+  );
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -265,6 +292,7 @@ function App() {
                     workerUrl={workerUrl}
                     userName={authUser?.name || "Guest Customer"}
                     userEmail={authUser?.email || ""}
+                    userPhotoUrl={authUser?.profile?.photoUrl || ""}
                     authToken={authToken}
                     onLogout={handleLogout}
                   />

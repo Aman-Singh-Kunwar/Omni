@@ -25,8 +25,19 @@ function BrokerTopNav({
   setIsMobileMenuOpen,
   onOpenRoleSwitch,
   onLogout,
-  userName
+  userName,
+  profilePhotoUrl = ""
 }) {
+  const hasProfilePhoto = Boolean(String(profilePhotoUrl || "").trim());
+  const renderAvatar = () =>
+    hasProfilePhoto ? (
+      <img src={profilePhotoUrl} alt={`${userName} profile`} className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+    ) : (
+      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+        <User className="w-4 h-4 text-white" />
+      </div>
+    );
+
   return (
     <nav ref={navRef} className="bg-white shadow-sm border-b sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -46,11 +57,10 @@ function BrokerTopNav({
                 <button
                   key={tab}
                   onClick={() => navigateToTab(tab)}
-                  className={`py-4 border-b-2 font-medium text-sm capitalize transition-colors ${
-                    activeTab === tab
+                  className={`py-4 border-b-2 font-medium text-sm capitalize transition-colors ${activeTab === tab
                       ? "border-green-500 text-green-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                    }`}
                 >
                   {tab === "overview" ? "dashboard" : tab.replace("-", " ")}
                 </button>
@@ -90,9 +100,8 @@ function BrokerTopNav({
                             key={normalizedNotificationId}
                             type="button"
                             onClick={() => onNotificationClick(notification)}
-                            className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
-                              isRead ? "bg-gray-50" : "bg-green-50/40"
-                            }`}
+                            className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${isRead ? "bg-gray-50" : "bg-green-50/40"
+                              }`}
                           >
                             <p className={`text-sm ${isRead ? "font-medium text-gray-500" : "font-semibold text-gray-900"}`}>
                               {notification.title}
@@ -137,9 +146,7 @@ function BrokerTopNav({
                 }}
                 className="hidden lg:flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50/80"
               >
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+                {renderAvatar()}
                 <div className="text-sm text-left">
                   <p className="font-medium text-gray-900">{userName}</p>
                   <p className="text-gray-500 text-xs">Network Manager</p>
@@ -156,9 +163,7 @@ function BrokerTopNav({
                 className="lg:hidden ui-touch-target p-2 text-gray-500 hover:text-gray-700"
                 aria-label="Open profile menu"
               >
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
+                {renderAvatar()}
               </button>
 
               {showUserMenu && (
@@ -215,9 +220,8 @@ function BrokerTopNav({
                   navigateToTab(tab);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`ui-touch-target w-full text-left block px-3 py-2 rounded-md text-base font-medium capitalize ${
-                  activeTab === tab ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                }`}
+                className={`ui-touch-target w-full text-left block px-3 py-2 rounded-md text-base font-medium capitalize ${activeTab === tab ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                  }`}
               >
                 {tab === "overview" ? "dashboard" : tab.replace("-", " ")}
               </button>

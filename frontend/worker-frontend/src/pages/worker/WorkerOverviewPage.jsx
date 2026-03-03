@@ -20,13 +20,18 @@ function StatCard({ icon: Icon, title, value }) {
 }
 
 function WorkerOverviewPage({ stats, jobRequests, recentJobs, setActiveTab, handleJobAction, processingJobId, jobActionError }) {
+  const totalEarnings = Number(stats?.totalEarnings || 0);
+  const completedJobs = Number(stats?.completedJobs || 0);
+  const averageRating = Number(stats?.averageRating || 0);
+  const pendingRequests = Number(stats?.pendingRequests || 0);
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={DollarSign} title="Total Earnings" value={`INR ${stats.totalEarnings.toLocaleString("en-IN")}`} />
-        <StatCard icon={CheckCircle} title="Completed Jobs" value={stats.completedJobs} />
-        <StatCard icon={Star} title="Average Rating" value={stats.averageRating} />
-        <StatCard icon={Clock} title="Pending Requests" value={stats.pendingRequests} />
+        <StatCard icon={DollarSign} title="Total Earnings" value={`INR ${totalEarnings.toLocaleString("en-IN")}`} />
+        <StatCard icon={CheckCircle} title="Completed Jobs" value={completedJobs} />
+        <StatCard icon={Star} title="Average Rating" value={averageRating} />
+        <StatCard icon={Clock} title="Pending Requests" value={pendingRequests} />
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">

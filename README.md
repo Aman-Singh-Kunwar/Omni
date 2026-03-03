@@ -1,6 +1,7 @@
 # Omni Monorepo
 
 A role-based service marketplace built as a JavaScript monorepo with one Express API and four React apps:
+
 - Landing app
 - Customer app
 - Broker app
@@ -38,13 +39,34 @@ This README covers complete local setup from clone to first run, including envir
 
 ## Feature Summary
 
-Short feature list by frontend is available in:
+Detailed feature list by frontend is available in `features.md`
 
-- `features.md`
+### Key Shared Utilities
+
+The project includes reusable utilities in `frontend/shared/`:
+
+**Hooks:**
+
+- `useSessionManagement.js` - Consolidated auth state management for all role apps (handles login, logout, session persistence with Remember Me support)
+- `useQuickMenuAutoClose.js` - Auto-close logic for dropdowns and menus
+- `useAutoDismissNotice.js` - Auto-dismiss notifications and banners
+
+**Components:**
+
+- `LoadingScreen.jsx` - Consistent loading spinner with logo across all apps
+
+**Utils:**
+
+- `appConfig.js` - Centralized configuration for API URLs and feature flags
+- `responsive.js` - Mobile-first responsive design utilities with breakpoints and common patterns
+- `mapUtils.js` - Shared map utilities (Haversine, ETA, OSRM routing, geocoding)
+- `realtime.js` - Socket.IO connection management
+- `createCachedApiClient.js` - API client with caching layer
 
 ## Tech Stack
 
 ### Backend
+
 - Node.js
 - Express
 - MongoDB + Mongoose
@@ -56,6 +78,7 @@ Short feature list by frontend is available in:
 - `nodemon` for local development
 
 ### Frontend
+
 - React 18
 - React Router v6
 - Vite 5
@@ -66,6 +89,7 @@ Short feature list by frontend is available in:
 - Lucide React icons
 
 ### Monorepo Tooling
+
 - npm workspaces (single root install for all packages)
 
 ## Monorepo Structure
@@ -97,7 +121,14 @@ Omni/
         mapUtils.js       ← Haversine, ETA, OSRM + geocoding shared by tracking modals
         common.js
         createCachedApiClient.js
+        appConfig.js      ← Centralized app configuration and URLs
+        responsive.js     ← Mobile-first responsive design utilities
       hooks/
+        useSessionManagement.js  ← Reusable auth/session management hook
+        useQuickMenuAutoClose.js
+        useAutoDismissNotice.js
+      components/
+        LoadingScreen.jsx ← Shared loading spinner with logo
         useQuickMenuAutoClose.js
         useAutoDismissNotice.js
       components/
@@ -298,6 +329,7 @@ npm run dev:worker
 ```
 
 After startup:
+
 - Landing: http://localhost:5173
 - Customer: http://localhost:5174
 - Broker: http://localhost:5175
@@ -491,6 +523,7 @@ Advisor callback request payload (`POST /customer/advisor-requests`):
 ## Data Model Overview
 
 ### User
+
 - Single user collection with role-based profiles:
   - `customerProfile`
   - `brokerProfile` (includes `brokerCode`)
@@ -498,6 +531,7 @@ Advisor callback request payload (`POST /customer/advisor-requests`):
 - Unique index on `(email, role)`.
 
 ### Booking
+
 - Stores customer, worker, broker linkage, service/time details, pricing, status, rating/feedback.
 - Stores customer GPS coordinates (`locationLat`, `locationLng`) set at booking creation for live tracking use. Coordinates are validated on the server: values outside lat −90…90 or lng −180…180 are stored as null.
 - Stores `chatMessages` array (embedded, no `_id`) with fields `messageId`, `senderId`, `senderName`, `senderRole`, `text`, `edited`, `timestamp`; array is capped at 200 entries per booking.
@@ -505,9 +539,11 @@ Advisor callback request payload (`POST /customer/advisor-requests`):
   - `pending`, `confirmed`, `in-progress`, `completed`, `cancelled`, `upcoming`, `failed`, `not-provided`
 
 ### Service
+
 - Catalog service documents with base price, category, provider count, and rating.
 
 ### AdvisorRequest
+
 - Stores customer callback requests submitted from `Talk to a Care Advisor`.
 - Fields:
   - `customerId`
@@ -577,4 +613,3 @@ From `package.json`:
 ## License and Usage
 
 This is a personal project. Do not copy, redistribute, or reuse this code outside authorized team members.
-

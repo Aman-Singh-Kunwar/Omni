@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Check, ChevronLeft, ChevronRight, Star, Tag, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Star, X, ArrowLeft, Home } from "lucide-react";
 import { careCategories } from "../../components/customer-dashboard/careCategoriesData";
 import ServiceSummaryPopup from "./ServiceSummaryPopup";
-import DetailsHeader from "../../components/DetailsHeader";
+import omniLogo from "../../assets/images/omni-logo.png";
 
 function toSafeString(value, fallback = "") {
   try {
@@ -180,6 +180,15 @@ function normalizePlan(rawPlan, index, basePrice, service, categoryTitle) {
   const name = toSafeString(rawPlan?.name, ["Essential", "Advanced", "Premium"][index] || `Plan ${index + 1}`);
   const discountPrice = Number(rawPlan?.price || basePrice + index * 350);
   const originalPrice = Number(rawPlan?.originalPrice || Math.round(discountPrice * 1.15));
+  const durationByPrice = (() => {
+    if (discountPrice >= basePrice + 700) {
+      return "2 hr 45 mins";
+    }
+    if (discountPrice >= basePrice + 350) {
+      return "2 hr 15 mins";
+    }
+    return "1 hr 30 mins";
+  })();
   const includedItems = Array.isArray(rawPlan?.includedItems) && rawPlan.includedItems.length
     ? rawPlan.includedItems.map((item) => toSafeString(item)).filter(Boolean)
     : [...(service.includes || []), ...(service.process || [])].map((item) => toSafeString(item)).filter(Boolean).slice(index, index + 5);
@@ -188,7 +197,7 @@ function normalizePlan(rawPlan, index, basePrice, service, categoryTitle) {
     id: toId(rawPlan?.id || `${serviceTitle}-${name}-${index}`),
     name,
     tagline: toSafeString(rawPlan?.tagline, `${safeCategoryTitle} care for ${serviceTitle.toLowerCase()}.`),
-    duration: toSafeString(rawPlan?.duration, toSafeString(service?.duration, "60 to 90 minutes")),
+    duration: toSafeString(rawPlan?.duration, durationByPrice),
     price: discountPrice,
     originalPrice,
     popular: Boolean(rawPlan?.popular ?? index === 1),
@@ -566,15 +575,13 @@ function ServiceDetailsPage() {
   const { slug, serviceSlug } = useParams();
   const plansRef = useRef(null);
   const [imageIndex, setImageIndex] = useState(0);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [activePlanDetailsId, setActivePlanDetailsId] = useState("");
   const [selectedOfferId, setSelectedOfferId] = useState("");
-  const [selectedComboIds, setSelectedComboIds] = useState([]);
   const [selectedAddOnIds, setSelectedAddOnIds] = useState([]);
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
   const [showBillDetails, setShowBillDetails] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   const category = careCategories.find((item) => item.slug === slug);
   const service = useMemo(
@@ -584,14 +591,12 @@ function ServiceDetailsPage() {
 
   useEffect(() => {
     setImageIndex(0);
-    setIsSummaryOpen(true);
-    setSearchQuery("");
     setActivePlanDetailsId("");
     setSelectedOfferId("");
-    setSelectedComboIds([]);
     setSelectedAddOnIds([]);
     setOpenFaqIndex(0);
     setShowBillDetails(false);
+    setIsSummaryOpen(false);
   }, [serviceSlug]);
 
   if (!category || !service) {
@@ -604,22 +609,12 @@ function ServiceDetailsPage() {
   const viewModel = buildServiceViewModel(service, category.title, gallery, basePrice);
   const theme = getCategoryTheme(slug);
 
-  const normalizedSearch = String(searchQuery || "").trim().toLowerCase();
-  const matchesSearch = (value) => toSafeString(value).toLowerCase().includes(normalizedSearch);
-  const matchesArray = (values = []) => values.some((item) => matchesSearch(item));
-
-  const filteredPlans = viewModel.plans.filter(
-    (plan) => !normalizedSearch || matchesSearch(plan.name) || matchesSearch(plan.tagline) || matchesArray(plan.includedItems)
-  );
-  const filteredCombos = viewModel.combos.filter(
-    (item) => !normalizedSearch || matchesSearch(item.title) || matchesSearch(item.subtitle) || matchesSearch(item.badge)
-  );
-  const filteredAddOns = viewModel.addOns.filter((item) => !normalizedSearch || matchesSearch(item.title));
-  const filteredCoveredItems = viewModel.coveredItems.filter((item) => !normalizedSearch || matchesSearch(item));
-  const filteredFaqs = viewModel.faqs.filter(
-    (item) => !normalizedSearch || matchesSearch(item.question) || matchesSearch(item.answer)
-  );
-  const filteredGuarantees = viewModel.guarantees.filter((item) => !normalizedSearch || matchesSearch(item));
+  const filteredPlans = viewModel.plans;
+  const filteredAddOns = viewModel.addOns;
+  const filteredCoveredItems = viewModel.coveredItems;
+  const filteredFaqs = viewModel.faqs;
+  const filteredGuarantees = viewModel.guarantees;
+  const filteredCombos = [];
 
   useEffect(() => {
     if (!filteredPlans.length) {
@@ -649,10 +644,9 @@ function ServiceDetailsPage() {
     const pool = [...directImages, ...gallery, ...includedItemImages, ...viewModel.beforeAfterImages, ...(viewModel.equipment || []).map((item) => item.image)];
     return Array.from(new Set(pool.filter(Boolean))).slice(0, 8);
   }, [activePlanDetails, gallery, viewModel.beforeAfterImages, viewModel.equipment]);
-  const selectedCombos = viewModel.combos.filter((item) => selectedComboIds.includes(item.id));
   const selectedAddOns = viewModel.addOns.filter((item) => selectedAddOnIds.includes(item.id));
-  const selectedExtras = [...selectedCombos, ...selectedAddOns];
-  const extrasTotal = [...selectedCombos, ...selectedAddOns].reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const selectedExtras = [...selectedAddOns];
+  const extrasTotal = selectedAddOns.reduce((sum, item) => sum + Number(item.price || 0), 0);
   const subtotalPrice = Number(selectedPlan?.price || viewModel.price) + extrasTotal;
   const selectedOffer = viewModel.discounts.find((offer) => offer.id === selectedOfferId) || null;
   const appliedDiscount = Math.min(Number(selectedOffer?.amount || 0), subtotalPrice);
@@ -672,10 +666,9 @@ function ServiceDetailsPage() {
     "Plumbing Support": "Plumber",
     "Electrical Care": "Electrician",
     "AC Maintenance": "AC Repair",
-    "General Repairs": "Carpenter",
+    "Car Service": "Car Service",
     "At-Home Hair Styling": "Hair Stylist",
     "Skin & Glow Rituals": "Hair Stylist",
-    "Wellness Grooming": "Hair Stylist",
     "Premium Car Wash": "Car Service",
     "Interior Detailing": "Car Service",
     "Routine Car Care": "Car Service"
@@ -692,7 +685,7 @@ function ServiceDetailsPage() {
       service: bookingService,
       price: String(Math.max(0, Math.round(totalPrice))),
       plan: selectedPlan?.name || "",
-      addons: [...selectedCombos, ...selectedAddOns].map((item) => item.title).join(",")
+      addons: selectedAddOns.map((item) => item.title).join(",")
       ,
       offer: selectedOffer?.title || "",
       discount: String(appliedDiscount)
@@ -708,7 +701,6 @@ function ServiceDetailsPage() {
     ...viewModel,
     coveredItems: filteredCoveredItems,
     plans: filteredPlans,
-    combos: filteredCombos,
     addOns: filteredAddOns,
     faqs: filteredFaqs,
     guarantees: filteredGuarantees,
@@ -717,11 +709,34 @@ function ServiceDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
-      <DetailsHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder={`Search in ${category.title} details...`}
-      />
+      <section className="border-b border-gray-200 bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-2">
+              <img src={omniLogo} alt="Omni logo" className="h-8 w-8 rounded-full object-contain" />
+              <span className="text-sm font-semibold text-gray-900">Omni</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/customer/category/${slug}`)}
+                className="rounded-full bg-gray-100 p-2 text-gray-700 transition-colors hover:bg-gray-200"
+                aria-label="Go back to category"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="rounded-full bg-gray-100 p-2 text-gray-700 transition-colors hover:bg-gray-200"
+                aria-label="Go to home page"
+              >
+                <Home className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="bg-gradient-to-b from-white to-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -769,23 +784,23 @@ function ServiceDetailsPage() {
                 <div className="mt-6 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
-                    onClick={goToBooking}
+                    onClick={openPlansSection}
                     className={`rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-lg ${theme.button}`}
                   >
-                    {selectedPlan ? "Select Plan" : "Add to Cart"}
+                    View Plans
                   </button>
                   <button
                     type="button"
-                    onClick={openPlansSection}
+                    onClick={goToBooking}
                     className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50"
                   >
-                    View Plans
+                    Continue Booking
                   </button>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                <div className="relative min-h-[420px] overflow-hidden rounded-2xl shadow-lg">
+                <div className="relative h-[340px] overflow-hidden rounded-2xl shadow-lg sm:h-[400px] lg:h-[460px]">
                   <div
                     className="flex h-full transition-transform duration-500 ease-out"
                     style={{ transform: `translateX(-${safeIndex * 100}%)` }}
@@ -873,14 +888,14 @@ function ServiceDetailsPage() {
                         }}
                         className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
                       >
-                        View Details
+                        View Plan
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedPlanId(plan.id)}
                         className={`rounded-xl px-4 py-2 text-sm font-medium text-white ${theme.button}`}
                       >
-                        Add
+                        Select Plan
                       </button>
                     </div>
                   </article>
@@ -891,80 +906,21 @@ function ServiceDetailsPage() {
         </section>
       )}
 
-      {(filteredCombos.length > 0 || filteredAddOns.length > 0) && (
+      {filteredAddOns.length > 0 && (
         <section className="py-8">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <h2 className="text-3xl font-semibold text-gray-900">Combos and Add-ons</h2>
+            <h2 className="text-3xl font-semibold text-gray-900">Add-ons</h2>
 
-            {filteredCombos.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900">Combos</h3>
-                <div className="mt-4 space-y-5">
-                  {filteredCombos.map((item, index) => {
-                    const selected = selectedComboIds.includes(item.id);
-                    return (
-                      <article key={item.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                        <div className="grid gap-4 md:grid-cols-[1fr_190px]">
-                          <div>
-                            <h4 className="text-2xl font-semibold text-gray-900">{item.title}</h4>
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                              <Star className={`h-4 w-4 fill-current ${theme.check}`} />
-                              <span>{item.rating}</span>
-                              <span>({Number(item.reviewCount).toLocaleString("en-IN")} reviews)</span>
-                            </div>
-                            <div className="mt-2 flex items-center gap-2 text-gray-700">
-                              <p className="text-2xl font-semibold text-gray-900">{formatInr(item.price)}</p>
-                              <span className="text-gray-400">•</span>
-                              <p className="text-sm text-gray-500">{item.duration}</p>
-                            </div>
-                            <div className="mt-2 flex items-center gap-1 text-sm text-emerald-600">
-                              <Tag className="h-4 w-4" />
-                              <span>{item.perUnitLabel}</span>
-                            </div>
-                            <p className="mt-3 text-sm text-gray-600">{item.subtitle}</p>
-                            <button
-                              type="button"
-                              onClick={() => setIsSummaryOpen(true)}
-                              className="mt-3 text-base font-semibold text-indigo-600 transition-colors hover:text-indigo-700"
-                            >
-                              View details
-                            </button>
-                          </div>
 
-                          <div className="relative">
-                            <div className="h-40 overflow-hidden rounded-xl bg-gray-100">
-                              <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
-                            </div>
-                            <span className={`absolute left-2 top-2 rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide ${getItemTone("combo", index)}`}>
-                              {item.badge}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => toggleSelection(item.id, setSelectedComboIds)}
-                              className={`absolute bottom-[-12px] left-1/2 -translate-x-1/2 rounded-xl border px-7 py-2 text-base font-semibold ${
-                                selected ? `${theme.buttonSolid} border-transparent text-white` : "border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50"
-                              }`}
-                            >
-                              {selected ? "Added" : "Add"}
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {filteredAddOns.length > 0 && (
               <div className="mt-7">
-                <h3 className="text-lg font-semibold text-gray-900">Add-ons</h3>
                 <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-3">
                   {filteredAddOns.map((item, index) => {
                     const selected = selectedAddOnIds.includes(item.id);
                     return (
                       <article key={item.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
-                        <div className="h-36 overflow-hidden rounded-xl bg-gray-100">
+                        <div className="h-48 overflow-hidden rounded-xl bg-gray-100">
                           <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
                         </div>
                         <p className="mt-3 text-base font-semibold text-gray-900">{item.title}</p>
@@ -1077,7 +1033,7 @@ function ServiceDetailsPage() {
                       className={`flex w-full items-center justify-between gap-4 py-4 text-left ${isOpen ? theme.check : "text-gray-800"}`}
                     >
                       <span className="text-base font-medium">{faq.question}</span>
-                      <span className={`text-xs font-semibold transition-transform ${isOpen ? "rotate-180" : ""}`}>v</span>
+                      <span className={`text-xs font-semibold transition-transform ${isOpen ? "" : ""}`}>{isOpen ? "-" : "+"}</span>
                     </button>
                     <div className={`grid overflow-hidden transition-all duration-300 ${isOpen ? "grid-rows-[1fr] pb-4 opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                       <p className="min-h-0 text-sm text-gray-600">{faq.answer}</p>
@@ -1090,12 +1046,12 @@ function ServiceDetailsPage() {
         </section>
       )}
 
-      <div className="sticky bottom-0 z-40 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 rounded-2xl border border-gray-200 px-6 py-4 shadow-sm lg:px-8">
-          <div className="min-w-0 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-white px-4 py-3 shadow-sm">
+      <div className="sticky bottom-0 z-40 bg-gray-100/95 backdrop-blur-sm">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 rounded-2xl border border-gray-400 px-6 py-4 shadow-sm lg:px-8">
+          <div className="min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <p className="text-base font-semibold uppercase tracking-wide text-indigo-700">Bill Details</p>
-              <span className="h-4 w-px bg-indigo-100" />
+              <p className="text-base font-semibold uppercase tracking-wide text-gray-700">Bill Details</p>
+              <span className="h-4 w-px bg-gray-200" />
               {compactBillItems.map((item, index) => (
                 <span key={`compact-bill-item-${index}`} className="text-sm text-gray-700">
                   + {item}
@@ -1105,7 +1061,7 @@ function ServiceDetailsPage() {
                 <button
                   type="button"
                   onClick={() => setShowBillDetails(true)}
-                  className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700"
+                  className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-800"
                 >
                   +{hiddenBillCount} more details
                 </button>
@@ -1114,24 +1070,24 @@ function ServiceDetailsPage() {
                 <button
                   type="button"
                   onClick={() => setShowBillDetails(false)}
-                  className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700"
+                  className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-800"
                 >
                   Hide details
                 </button>
               )}
             </div>
             {showBillDetails && (
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-indigo-100 pt-2">
-                {billDetailItems.map((item, index) => (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-gray-200 pt-2">
+                {billDetailItems.slice(3).map((item, index) => (
                   <span key={`bill-item-${index}`} className="text-sm text-gray-600">
                     + {item}
                   </span>
                 ))}
               </div>
             )}
-            <div className="mt-2.5 space-y-0.5 border-t border-indigo-100 pt-2">
+            <div className="mt-2.5 space-y-0.5 border-t border-gray-200 pt-2">
               <p className="text-sm text-gray-600">Subtotal: {formatInr(subtotalPrice)}</p>
-              <p className="text-sm font-medium text-indigo-600">Discount: - {formatInr(appliedDiscount)}</p>
+              <p className="text-sm font-medium text-gray-600">Discount: - {formatInr(appliedDiscount)}</p>
               <p className="text-xl font-semibold text-gray-900">Final Total: {formatInr(totalPrice)}</p>
             </div>
           </div>

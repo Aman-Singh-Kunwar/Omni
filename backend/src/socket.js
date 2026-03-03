@@ -243,7 +243,6 @@ function setupSocketHandlers(io) {
           timestamp: timestamp.toISOString()
         });
       } catch (_error) {
-        // Ignore chat persistence errors — do not crash the socket.
       }
     });
 
@@ -278,7 +277,6 @@ function setupSocketHandlers(io) {
         );
         io.to(`booking:${chatBookingId}`).emit("chat:deleted", { bookingId: chatBookingId, messageIds });
       } catch (_error) {
-        // Ignore delete errors.
       }
     });
 
@@ -308,7 +306,6 @@ function setupSocketHandlers(io) {
           text: newText
         });
       } catch (_error) {
-        // Ignore edit errors.
       }
     });
 
