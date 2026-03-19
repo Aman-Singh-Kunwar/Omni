@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import FloatingChatbot from "@shared/components/FloatingChatbot";
 import AuthPage from "./components/AuthPage";
 import LandingPage from "./components/LandingPage";
 
@@ -26,6 +27,8 @@ function ScrollToTop() {
 }
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [config, setConfig] = useState(defaultConfig);
 
   useEffect(() => {
@@ -51,6 +54,25 @@ function App() {
     workerUrl: config.apps?.worker || defaultConfig.apps.worker
   };
 
+  const handleChatbotNavigate = useCallback((path) => {
+    const normalizedPath = String(path || "").trim();
+    if (!normalizedPath) return;
+
+    if (
+      normalizedPath === "/" ||
+      normalizedPath.startsWith("/?") ||
+      normalizedPath.startsWith("/login") ||
+      normalizedPath.startsWith("/signup")
+    ) {
+      navigate(normalizedPath);
+      return;
+    }
+
+    const customerApp = String(routeProps.customerUrl || defaultConfig.apps.customer).replace(/\/+$/, "");
+    const hashPath = normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
+    window.location.assign(`${customerApp}/#${hashPath}`);
+  }, [navigate, routeProps.customerUrl]);
+
   return (
     <>
       <ScrollToTop />
@@ -60,6 +82,14 @@ function App() {
         <Route path="/signup" element={<AuthPage mode="signup" {...routeProps} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <FloatingChatbot
+        role="landing"
+        chatRole="landing"
+        userName="Visitor"
+        currentPath={location.pathname}
+        currentSearch={location.search}
+        onNavigate={handleChatbotNavigate}
+      />
     </>
   );
 }

@@ -33,6 +33,17 @@
 - Shared map utility library (`@shared/utils/mapUtils`) centralises Haversine distance, ETA formatting, OSRM route fetching, and Nominatim geocoding used by both live-tracking modals — eliminating duplication between customer and worker frontends.
 - Session management consolidated in `useSessionManagement.js` hook - reduces App.jsx complexity and ensures consistent auth behavior across all role apps.
 
+### Shared Chatbot Assistant
+
+- One shared chatbot system is mounted across all role apps via `FloatingChatbot.jsx` and `ChatWindow.jsx`.
+- Role-aware chatbot personas and themes support: landing guide, customer assistant, worker assistant, broker assistant.
+- Chat UI is modularized into focused helpers under `frontend/shared/components/chatbot/` (theme/config, message bubble, speech helpers, session storage helpers).
+- Chat history, lightweight conversation context, and selected language are persisted per role/user session for continuity.
+- Suggested action chips support quick navigation or follow-up prompts directly from bot responses.
+- Speech features include microphone input (STT), reply speaker (TTS), and click-again-to-stop playback.
+- Mobile/touch UX includes responsive chat sizing, safe-area offsets, swipe-down minimize from header, and haptic feedback on supported devices.
+- Navigation inside shared chatbot is decoupled from router internals using app-level callback injection (`onNavigate`) to keep shared components framework-agnostic.
+
 ## Landing Frontend
 
 - Public role cards for customer, worker, and broker with direct login/signup actions.
@@ -45,6 +56,7 @@
 - API-based authentication against backend `/auth/login` and `/auth/signup`.
 - Successful auth redirects users to selected role app with auth token.
 - Responsive marketing sections, FAQ accordion with plus-toggle icon, and footer contact blocks.
+- Landing chatbot uses dedicated `landing` backend role, deterministic knowledge answers, and section deep-links (`/?section=...`) for guided exploration.
 
 ## Customer Frontend
 
@@ -98,6 +110,7 @@
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
 - Mobile navigation keeps section links in 3-dot menu and account actions in profile dropdown.
+- Customer dashboard includes role-aware chatbot with service recommendation, booking guidance, pricing help, and booking-status navigation.
 
 ## Worker Frontend
 
@@ -124,6 +137,7 @@
 - Phone validation enforced in profile UI: digits only, length 10-13.
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
+- Worker dashboard includes role-aware chatbot for job requests, schedule, earnings, profile updates, and broker-link guidance.
 
 ## Broker Frontend
 
@@ -143,10 +157,16 @@
 - Phone validation enforced in profile UI: digits only, length 10-13.
 - Gender options are limited to: prefer not to say, male, female, other.
 - Settings include notification preferences, password update, logout, and delete account.
+- Broker dashboard includes role-aware chatbot for worker network navigation, commission context, bookings, and broker-code guidance.
 
 ## Backend Features Supporting Frontends
 
 - Modular route structure (`auth`, `profile`, `customer`, `worker`, `broker`, `catalog`, `health`).
+- Chatbot API route (`POST /chatbot`) provides a hybrid assistant pipeline: command-map fast path, role intent detection, and Groq completion fallback.
+- Chatbot response caching reduces repeated LLM calls (cache key includes role, language, intent, and normalized message hash).
+- Landing deterministic knowledge logic is isolated in `chatbot/landingKnowledge.js` to keep route orchestration modular and maintainable.
+- Chatbot supports role-scoped intents for `landing`, `customer`, `worker`, and `broker`, including role-specific suggestion chips and navigation hints.
+- Language behavior supports `auto`, `en-IN`, and `hi-IN` with response-language enforcement/rewrites when model output mismatches the selected language.
 - Auth routes split into grouped modules:
   - `auth/public/*` (signup/password/session public flows)
   - `auth/roleRoutes.js`

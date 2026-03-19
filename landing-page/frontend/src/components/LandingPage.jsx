@@ -35,9 +35,22 @@ function LandingPage() {
   );
 
   useEffect(() => {
-    const role = new URLSearchParams(location.search).get("role") || new URLSearchParams(window.location.search).get("role");
+    const params = new URLSearchParams(location.search || window.location.search);
+    const role = params.get("role");
     if (role && roleList.includes(role)) {
       navigate(`/login?role=${role}`, { replace: true });
+      return;
+    }
+
+    const section = params.get("section");
+    const allowedSections = new Set(["roles", "services", "how-it-works", "faq", "testimonials", "trust"]);
+    if (section && allowedSections.has(section)) {
+      window.setTimeout(() => {
+        const target = document.getElementById(section);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 120);
     }
   }, [location.search, navigate]);
 
@@ -330,7 +343,7 @@ function LandingPage() {
           </div>
         </section>
 
-        <section className="py-8 px-4">
+        <section id="trust" className="py-8 px-4">
           <div className="max-w-7xl mx-auto">
             <div className="glass-card rounded-2xl border border-gray-200 px-6 py-5">
               <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
@@ -414,7 +427,7 @@ function LandingPage() {
           </div>
         </section>
 
-        <section className="py-20 px-4">
+        <section id="testimonials" className="py-20 px-4">
           <div className="max-w-7xl mx-auto">
             <h3 className="text-3xl font-bold text-center text-gray-900 mb-4">What Users Say</h3>
             <p className="text-center text-gray-600 mb-12">Real feedback from our growing Omni community.</p>

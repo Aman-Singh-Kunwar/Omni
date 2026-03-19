@@ -62,7 +62,7 @@ function InitialFit({ workerPosition, customerPosition }) {
   return null;
 }
 
-function CustomerLocationModal({ open, onClose, booking, authToken }) {
+function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSharing = false }) {
   const [workerPosition, setWorkerPosition] = useState(null);
   const [gpsError, setGpsError] = useState("");
   const [isSharing, setIsSharing] = useState(false);
@@ -217,6 +217,11 @@ function CustomerLocationModal({ open, onClose, booking, authToken }) {
     shareIntervalRef.current = interval;
     setIsSharing(true);
   }, [authToken, bookingId]);
+
+  useEffect(() => {
+    if (!open || !autoStartSharing || isSharing || !workerPosition) return;
+    startSharing();
+  }, [autoStartSharing, isSharing, open, startSharing, workerPosition]);
 
   // Warn before browser tab/window close while sharing is active
   useEffect(() => {

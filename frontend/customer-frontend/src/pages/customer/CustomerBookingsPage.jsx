@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import LiveTrackingModal from "../../components/LiveTrackingModal";
 import ChatModal from "@shared/components/ChatModal";
+import { clearChatbotPendingAction, readChatbotPendingAction } from "@shared/components/chatbot/sessionStorage";
 
 const CANCEL_WINDOW_MS = 10 * 60 * 1000;
 const REVIEW_MEDIA_MAX_ITEMS = 4;
@@ -38,6 +39,24 @@ const cancelEligibleStatuses = new Set(["pending", "confirmed", "upcoming"]);
 const reviewEligibleStatuses = new Set(["confirmed", "in-progress", "completed", "not-provided"]);
 const trackEligibleStatuses = new Set(["confirmed", "in-progress", "upcoming"]);
 const chatEligibleStatuses = new Set(["confirmed", "in-progress", "upcoming"]);
+
+function findEligibleBooking(bookings, requestedBookingId, eligibleStatuses) {
+  const requestedId = String(requestedBookingId || "").trim();
+  const normalizedBookings = Array.isArray(bookings) ? bookings : [];
+
+  if (requestedId) {
+    const exactMatch = normalizedBookings.find((booking) => {
+      const bookingId = String(booking?.id || booking?._id || "").trim();
+      const status = String(booking?.status || "").toLowerCase();
+      return bookingId === requestedId && eligibleStatuses.has(status);
+    });
+    if (exactMatch) return exactMatch;
+  }
+
+  return (
+    normalizedBookings.find((booking) => eligibleStatuses.has(String(booking?.status || "").toLowerCase())) || null
+  );
+}
 
 const SERVICE_VISUALS = [
   { tokens: ["plumber", "plumbing"], icon: Droplets, containerClass: "bg-blue-100", iconClass: "text-blue-600" },
@@ -170,6 +189,36 @@ function CustomerBookingsPage({
     const timerId = window.setInterval(() => setNowTs(Date.now()), 1000);
     return () => window.clearInterval(timerId);
   }, []);
+
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (pendingAction?.type !== "customer_bookings_action") return;
+
+    if (!Array.isArray(recentBookings) || recentBookings.length === 0) {
+      return;
+    }
+
+    const payload = pendingAction.payload || {};
+    const actionType = String(payload.action || "").toLowerCase();
+    const requestedBookingId = String(payload.bookingId || "").trim();
+
+    clearChatbotPendingAction();
+
+    if (actionType === "open_tracking") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, trackEligibleStatuses);
+      if (!targetBooking) return;
+      setChatBooking(null);
+      setTrackingBooking(targetBooking);
+      return;
+    }
+
+    if (actionType === "open_chat") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, chatEligibleStatuses);
+      if (!targetBooking) return;
+      setTrackingBooking(null);
+      setChatBooking(targetBooking);
+    }
+  }, [recentBookings]);
 
   const getRemainingMs = (booking) => {
     const createdAtTs = new Date(booking.createdAt || "").getTime();

@@ -55,6 +55,36 @@ const NAV_ITEMS = [
   { id: 'bookings', name: 'My Bookings', icon: Calendar },
   { id: 'favorites', name: 'Favorites', icon: Heart }
 ];
+const CHATBOT_BOOKING_ACTION_KEY = 'omni:chatbot-pending-booking-action';
+
+function readPendingBookingAutomationAction() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(CHATBOT_BOOKING_ACTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.type !== 'customer_booking_flow' || !parsed.payload) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function clearPendingBookingAutomationAction() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(CHATBOT_BOOKING_ACTION_KEY);
+  } catch (_error) {
+    // Ignore storage errors.
+  }
+}
+
+function resolveDateByMode(mode) {
+  const normalizedMode = String(mode || '').trim().toLowerCase();
+  const date = new Date();
+  if (normalizedMode === 'tomorrow') date.setDate(date.getDate() + 1);
+  return date.toISOString().split('T')[0];
+}
 
 function GlobalStyles() {
   return (
@@ -110,6 +140,8 @@ const CustomerDashboard = ({
   const userMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const navRef = useRef(null);
+  const appliedBookingAutomationIdRef = useRef('');
+  const pendingAutoSubmitConfigRef = useRef({ enabled: false, requiresLocation: false });
   const navigate = useNavigate();
   const location = useLocation();
   const activeTab = PATH_TAB_MAP[location.pathname] || 'home';
@@ -273,6 +305,72 @@ const CustomerDashboard = ({
     }));
     setBookingStatus({ loading: false, error: '' });
   }, [activeTab, bookingSource, bookingQuery.workerId, bookingQuery.service]);
+
+  useEffect(() => {
+    if (activeTab !== 'bookService') return;
+
+    const action = readPendingBookingAutomationAction();
+    if (!action?.payload) return;
+
+    const actionId = String(action.payload.id || '').trim();
+    if (!actionId || actionId === appliedBookingAutomationIdRef.current) return;
+
+    appliedBookingAutomationIdRef.current = actionId;
+    const resolvedDate = resolveDateByMode(action.payload.dateMode) || String(action.payload.explicitDate || '').trim();
+    const requestedTime = String(action.payload.time || '').trim();
+    const requestedDescription = String(action.payload.description || '').trim();
+    const requestedService = String(action.payload.serviceName || '').trim();
+    const requestedLocation = String(action.payload.location || '').trim();
+
+    setBookingForm((prev) => ({
+      ...prev,
+      workerId: '',
+      service: requestedService || prev.service,
+      date: resolvedDate || prev.date,
+      time: requestedTime || prev.time,
+      description: requestedDescription || prev.description,
+      location: requestedLocation || prev.location,
+      locationLat: requestedLocation ? '' : prev.locationLat,
+      locationLng: requestedLocation ? '' : prev.locationLng
+    }));
+
+    if (action.payload.useCurrentLocation && navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = Number(position?.coords?.latitude);
+          const lng = Number(position?.coords?.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+          setBookingForm((prev) => ({
+            ...prev,
+            location: `Current location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+            locationLat: lat,
+            locationLng: lng
+          }));
+        },
+        () => {
+          setBookingForm((prev) => ({
+            ...prev,
+            location: prev.location || 'Current location',
+            locationLat: prev.locationLat || '',
+            locationLng: prev.locationLng || ''
+          }));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    pendingAutoSubmitConfigRef.current = {
+      enabled: Boolean(action.payload.autoSubmit),
+      requiresLocation: Boolean(action.payload.useCurrentLocation)
+    };
+
+    clearPendingBookingAutomationAction();
+  }, [activeTab]);
 
   const loadWorkers = useCallback(async ({ forceFresh = true } = {}) => {
     if (!authToken) { setAvailableWorkers([]); setWorkersLoading(false); return; }
@@ -597,6 +695,30 @@ const CustomerDashboard = ({
     : bookingSource === 'worker'
       ? Boolean(selectedWorkerDetails) && Boolean(bookingForm.service) && workerSupportsSelectedService
       : false;
+
+  useEffect(() => {
+    const autoSubmitConfig = pendingAutoSubmitConfigRef.current;
+    if (!autoSubmitConfig.enabled) return;
+    if (activeTab !== 'bookService') return;
+    if (bookingStatus.loading || !canSubmitBooking) return;
+    if (!bookingForm.date || !bookingForm.time) return;
+
+    const hasLocation = Boolean(String(bookingForm.location || '').trim());
+    if (autoSubmitConfig.requiresLocation && !hasLocation) return;
+
+    pendingAutoSubmitConfigRef.current = { enabled: false, requiresLocation: false };
+    window.setTimeout(() => {
+      handleBookService();
+    }, 320);
+  }, [
+    activeTab,
+    bookingForm.date,
+    bookingForm.location,
+    bookingForm.time,
+    bookingStatus.loading,
+    canSubmitBooking,
+    handleBookService
+  ]);
 
   const renderActivePage = () => {
     if (activeTab === 'home') {

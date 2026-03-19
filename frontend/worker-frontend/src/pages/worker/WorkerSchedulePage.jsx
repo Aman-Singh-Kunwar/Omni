@@ -1,13 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, Clock, MapPin, MessageCircle, Navigation } from "lucide-react";
 import CustomerLocationModal from "../../components/CustomerLocationModal";
 import ChatModal from "@shared/components/ChatModal";
+import { clearChatbotPendingAction, readChatbotPendingAction } from "@shared/components/chatbot/sessionStorage";
 
 function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
   const navigate = useNavigate();
   const [locationJob, setLocationJob] = useState(null);
   const [chatJob, setChatJob] = useState(null);
+  const [autoStartShare, setAutoStartShare] = useState(false);
 
   const handleBackClick = () => {
     if (window.history.length > 1) {
@@ -16,6 +18,40 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
     }
     navigate("/");
   };
+
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (pendingAction?.type !== "worker_schedule_action") return;
+
+    if (!Array.isArray(scheduleJobs) || scheduleJobs.length === 0) {
+      return;
+    }
+
+    const payload = pendingAction.payload || {};
+    const actionType = String(payload.action || "").toLowerCase();
+    const requestedBookingId = String(payload.bookingId || "").trim();
+    const explicitTarget = requestedBookingId
+      ? scheduleJobs.find((job) => String(job?.id || "").trim() === requestedBookingId)
+      : null;
+    const targetJob = explicitTarget || scheduleJobs[0];
+
+    clearChatbotPendingAction();
+
+    if (!targetJob) return;
+
+    if (actionType === "open_location") {
+      setChatJob(null);
+      setLocationJob(targetJob);
+      setAutoStartShare(Boolean(payload.autoShare));
+      return;
+    }
+
+    if (actionType === "open_chat") {
+      setLocationJob(null);
+      setAutoStartShare(false);
+      setChatJob(targetJob);
+    }
+  }, [scheduleJobs]);
 
   return (
     <>
@@ -60,7 +96,10 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
                       {(job.locationLat != null || !!job.location) && (
                         <button
                           type="button"
-                          onClick={() => setLocationJob(job)}
+                          onClick={() => {
+                            setAutoStartShare(false);
+                            setLocationJob(job);
+                          }}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
                         >
                           <Navigation className="h-3.5 w-3.5" />
@@ -97,9 +136,13 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
       />
       <CustomerLocationModal
         open={locationJob != null}
-        onClose={() => setLocationJob(null)}
+        onClose={() => {
+          setLocationJob(null);
+          setAutoStartShare(false);
+        }}
         booking={locationJob}
         authToken={authToken}
+        autoStartSharing={autoStartShare}
       />
     </>
   );

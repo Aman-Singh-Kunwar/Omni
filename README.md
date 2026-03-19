@@ -54,6 +54,9 @@ The project includes reusable utilities in `frontend/shared/`:
 **Components:**
 
 - `LoadingScreen.jsx` - Consistent loading spinner with logo across all apps
+- `FloatingChatbot.jsx` - Shared floating launcher used in landing, customer, worker, and broker apps
+- `ChatWindow.jsx` + `components/chatbot/*` - Modular role-aware chat UI, speech, and session helpers
+- `VoiceInput.jsx` - Shared speech-to-text microphone input for chatbot flows
 
 **Utils:**
 
@@ -62,6 +65,19 @@ The project includes reusable utilities in `frontend/shared/`:
 - `mapUtils.js` - Shared map utilities (Haversine, ETA, OSRM routing, geocoding)
 - `realtime.js` - Socket.IO connection management
 - `createCachedApiClient.js` - API client with caching layer
+
+### Shared Chatbot Platform
+
+- One shared chatbot UI layer powers all roles with role-specific theming and welcome actions (`landing`, `customer`, `worker`, `broker`).
+- Backend chatbot endpoint (`POST /api/chatbot`) uses a hybrid flow:
+  - deterministic command matching for instant navigation replies
+  - role-aware intent detection and system prompts
+  - Groq completions fallback for conversational answers
+- Landing chatbot includes deterministic knowledge responses (how-it-works, testimonials, FAQs, services, trust) and section deep-links.
+- Customer chatbot booking automation enforces service-first flow and opens booking form only when details are explicit.
+- Voice features include language-aware STT (`auto`/`en-IN`/`hi-IN`) and per-message TTS with click-to-stop behavior.
+- Mobile UX includes safe-area friendly placement, responsive sizing, swipe-down minimize gesture, and optional haptic feedback on supported devices.
+- Chat session state (recent messages/history/language) is persisted per role+user in session storage.
 
 ## Tech Stack
 

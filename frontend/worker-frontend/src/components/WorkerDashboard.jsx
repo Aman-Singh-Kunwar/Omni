@@ -12,6 +12,7 @@ import { landingUrl } from "./worker-dashboard/constants";
 import useWorkerDashboardData from "./worker-dashboard/useWorkerDashboardData";
 import useWorkerProfile from "./worker-dashboard/useWorkerProfile";
 import useWorkerNotifications from "./worker-dashboard/useWorkerNotifications";
+import { clearChatbotPendingAction, readChatbotPendingAction } from "@shared/components/chatbot/sessionStorage";
 
 const WorkerOverviewPage = lazy(() => import("../pages/worker/WorkerOverviewPage"));
 const WorkerJobRequestsPage = lazy(() => import("../pages/worker/WorkerJobRequestsPage"));
@@ -146,6 +147,39 @@ const WorkerDashboard = ({
       setProcessingJobId("");
     }
   };
+
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (pendingAction?.type !== "worker_job_action") return;
+
+    const payload = pendingAction.payload || {};
+    const actionType = String(payload.action || "").toLowerCase();
+    if (!actionType || !["accept", "reject"].includes(actionType)) {
+      clearChatbotPendingAction();
+      return;
+    }
+
+    if (!authToken) {
+      setJobActionError("Please log in to manage job requests.");
+      clearChatbotPendingAction();
+      return;
+    }
+
+    if (!Array.isArray(jobRequests) || jobRequests.length === 0) {
+      return;
+    }
+
+    const requestedBookingId = String(payload.bookingId || "").trim();
+    const explicitTarget = requestedBookingId
+      ? jobRequests.find((job) => String(job?.id || "").trim() === requestedBookingId)
+      : null;
+    const targetJob = explicitTarget || jobRequests[0];
+
+    clearChatbotPendingAction();
+    if (!targetJob?.id) return;
+
+    handleJobAction(targetJob.id, actionType);
+  }, [authToken, handleJobAction, jobRequests]);
 
   const handleRoleSwitch = async (role) => {
     const targetUrl = role === "customer" ? customerUrl : role === "broker" ? brokerUrl : "";

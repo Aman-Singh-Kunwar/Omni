@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import api from "./api";
+import FloatingChatbot from "@shared/components/FloatingChatbot";
 
 const role = "broker";
 const defaultCustomerUrl = import.meta.env.PROD ? "https://omni-customer.onrender.com" : "http://localhost:5174";
@@ -276,8 +277,9 @@ function App() {
   }
 
   return (
-    <Suspense fallback={<RouteLoader />}>
-      <Routes>
+    <>
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
         <Route
           path="/login"
           element={
@@ -323,9 +325,20 @@ function App() {
           />
         ))}
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      {isAuthenticated ? (
+        <FloatingChatbot
+          role="broker"
+          authToken={authToken}
+          userName={authUser?.name || "Broker"}
+          currentPath={location.pathname}
+          currentSearch={location.search}
+          onNavigate={navigate}
+        />
+      ) : null}
+    </>
   );
 }
 
