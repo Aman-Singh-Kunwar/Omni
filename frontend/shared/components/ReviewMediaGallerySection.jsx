@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from "react";
-import { ChevronLeft, ChevronRight, Video } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Video, Filter } from "lucide-react";
 
 function normalizeMediaFromReviews(reviews = []) {
   if (!Array.isArray(reviews)) {
@@ -18,7 +18,8 @@ function normalizeMediaFromReviews(reviews = []) {
         id: `${String(review?.id || "review")}-${index}`,
         kind: media?.kind === "video" ? "video" : "image",
         dataUrl,
-        customerName: String(review?.customerName || "Customer")
+        customerName: String(review?.customerName || "Customer"),
+        serviceName: String(review?.service || "General").trim()
       });
     });
   });
@@ -26,10 +27,23 @@ function normalizeMediaFromReviews(reviews = []) {
 }
 
 function ReviewMediaGallerySection({ reviews = [], className = "" }) {
-  const mediaItems = useMemo(() => normalizeMediaFromReviews(reviews), [reviews]);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  
+  const allMediaItems = useMemo(() => normalizeMediaFromReviews(reviews), [reviews]);
+  
+  const categories = useMemo(() => {
+    const cats = new Set(allMediaItems.map(item => item.serviceName));
+    return ["All", ...Array.from(cats)].sort();
+  }, [allMediaItems]);
+
+  const mediaItems = useMemo(() => {
+    if (selectedCategory === "All") return allMediaItems;
+    return allMediaItems.filter(item => item.serviceName === selectedCategory);
+  }, [allMediaItems, selectedCategory]);
+
   const scrollerRef = useRef(null);
 
-  if (!mediaItems.length) {
+  if (!allMediaItems.length) {
     return null;
   }
 
@@ -49,15 +63,29 @@ function ReviewMediaGallerySection({ reviews = [], className = "" }) {
 
   return (
     <section className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`.trim()}>
-      <div className="flex items-center justify-between gap-3">
-        <h4 className="text-base font-semibold text-gray-900">Reviews with images</h4>
-        <button
-          type="button"
-          onClick={scrollToEnd}
-          className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
-        >
-          See all photos
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          Portfolio & Recent Work
+        </h4>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-gray-400" />
+          <select 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="text-xs border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-700 focus:border-blue-500 focus:ring-blue-500"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={scrollToEnd}
+            className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline ml-2 hidden sm:block"
+          >
+            See all photos
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-2">

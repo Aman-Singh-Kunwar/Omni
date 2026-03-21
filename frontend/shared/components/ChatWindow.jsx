@@ -32,6 +32,26 @@ import { resolveSpeechLanguageFromSelection, sanitizeSpeechText } from "./chatbo
 // ── Config ────────────────────────────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+const RECENT_COMMANDS_LIMIT = 8;
+
+function isDestructiveAutomationAction(action) {
+  if (!action || typeof action !== "object") return false;
+  const actionType = String(action.type || "").toLowerCase();
+  const payloadAction = String(action.payload?.action || "").toLowerCase();
+  const destructivePayloadActions = new Set(["cancel", "delete", "reject", "decline", "remove"]);
+  const destructiveTypes = new Set(["customer_bookings_action", "worker_job_action", "chat_message_action"]);
+  return destructiveTypes.has(actionType) && destructivePayloadActions.has(payloadAction);
+}
+
+function estimateConfidenceScore(replyText = "", hasAutomationAction = false) {
+  const text = String(replyText || "").toLowerCase();
+  if (!text) return 0.55;
+  if (hasAutomationAction && /done|completed|opened|navigated|ready|updated/.test(text)) return 0.9;
+  if (/maybe|might|could|try|i think|not sure/.test(text)) return 0.62;
+  if (/can't|unable|failed|error/.test(text)) return 0.58;
+  return hasAutomationAction ? 0.82 : 0.74;
+}
+
 export default function ChatWindow({
   role = "customer",
   apiRole,
@@ -78,6 +98,10 @@ export default function ChatWindow({
   const [isVoiceOn, setIsVoiceOn]     = useState(false);
   const [language, setLanguage]       = useState(() => initialSession?.language || "auto"); // "auto" | "en-IN" | "hi-IN"
   const [currentSpeakingId, setCurrentSpeakingId] = useState(null);
+  const [pendingConfirmationAction, setPendingConfirmationAction] = useState(null);
+  const [recentCommands, setRecentCommands] = useState(() => initialSession?.recentCommands || []);
+  const [showRecentCommands, setShowRecentCommands] = useState(false);
+  const [undoState, setUndoState] = useState({ visible: false, label: "", timeoutId: null });
   const languageRef                   = useRef("auto");
   const messagesEndRef                = useRef(null);
   const inputRef                      = useRef(null);
@@ -115,9 +139,10 @@ export default function ChatWindow({
     saveSessionState(sessionKeyRef.current, {
       messages: recentMessages,
       history: recentHistory,
-      language
+      language,
+      recentCommands: recentCommands.slice(-RECENT_COMMANDS_LIMIT)
     });
-  }, [messages, language]);
+  }, [messages, language, recentCommands]);
 
   function speakGuidanceForPath(path) {
     if (!window.speechSynthesis) return;
@@ -176,6 +201,10 @@ export default function ChatWindow({
     const userText = text.trim();
     setInputText("");
     triggerHapticFeedback(8);
+    setRecentCommands((prev) => [
+      ...prev,
+      { id: `cmd-${Date.now()}`, text: userText, timestamp: new Date().toISOString() }
+    ].slice(-RECENT_COMMANDS_LIMIT));
 
     // Append user bubble
     setMessages((prev) => [...prev, {
@@ -245,7 +274,8 @@ export default function ChatWindow({
         timestamp:        data.timestamp || new Date().toISOString(),
         navigateTo:       data.navigateTo || null,
         suggestedActions: data.suggestedActions || null,
-        type:             data.type
+        type:             data.type,
+        confidence:       estimateConfidenceScore(data.reply, Boolean(data?.action))
       };
 
       setMessages((prev) => [...prev, botMsg]);
@@ -260,21 +290,57 @@ export default function ChatWindow({
       const shouldPersistGenericAction = new Set([
         "customer_bookings_action",
         "worker_job_action",
-        "worker_schedule_action"
+        "worker_schedule_action",
+        "worker_page_action",
+        "chat_message_action",
+        "dashboard_notification_action",
+        "role_switch_action",
+        "broker_workers_action",
+        "broker_profile_action",
+        "profile_section_action",
+        "settings_section_action"
       ]).has(automationAction?.type);
+      const shouldRequirePreview = isDestructiveAutomationAction(automationAction) && automationAction?.payload?.confirmed !== true;
+
+      if (shouldRequirePreview) {
+        setPendingConfirmationAction(automationAction);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `confirm-${Date.now()}`,
+            role: "bot",
+            text: "Please confirm before I continue with this action.",
+            timestamp: new Date().toISOString(),
+            suggestedActions: [
+              { label: "Confirm Action", action: "confirm_pending_action" },
+              { label: "Cancel", action: "cancel_pending_action" }
+            ]
+          }
+        ]);
+      }
+
       if (shouldPersistGenericAction) {
-        persistChatbotPendingAction(automationAction);
+        if (!shouldRequirePreview) {
+          persistChatbotPendingAction(automationAction);
+          if (undoState.timeoutId) {
+            window.clearTimeout(undoState.timeoutId);
+          }
+          const timeoutId = window.setTimeout(() => {
+            setUndoState({ visible: false, label: "", timeoutId: null });
+          }, 6000);
+          setUndoState({ visible: true, label: "Action queued", timeoutId });
+        }
       }
 
       const shouldPersistBookingAction =
         automationAction?.type === "customer_booking_flow" && automationAction?.payload?.flowStep === "booking_form";
-      if (shouldPersistBookingAction) {
+      if (shouldPersistBookingAction && !shouldRequirePreview) {
         persistPendingBookingAutomationAction(automationAction);
       } else {
         clearPendingBookingAutomationAction();
       }
 
-      if (!shouldPersistGenericAction) {
+      if (!shouldPersistGenericAction || shouldRequirePreview) {
         clearChatbotPendingAction();
       }
 

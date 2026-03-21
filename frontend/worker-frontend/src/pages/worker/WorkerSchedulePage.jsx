@@ -10,6 +10,8 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
   const [locationJob, setLocationJob] = useState(null);
   const [chatJob, setChatJob] = useState(null);
   const [autoStartShare, setAutoStartShare] = useState(false);
+  const [autoStopShare, setAutoStopShare] = useState(false);
+  const [pendingChatAutomation, setPendingChatAutomation] = useState(null);
 
   const handleBackClick = () => {
     if (window.history.length > 1) {
@@ -21,11 +23,38 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
 
   useEffect(() => {
     const pendingAction = readChatbotPendingAction();
-    if (pendingAction?.type !== "worker_schedule_action") return;
+    const actionTypeRoot = String(pendingAction?.type || "").toLowerCase();
+    if (!actionTypeRoot) return;
 
     if (!Array.isArray(scheduleJobs) || scheduleJobs.length === 0) {
       return;
     }
+
+    if (actionTypeRoot === "chat_message_action") {
+      const payload = pendingAction.payload || {};
+      const requestedBookingId = String(payload.bookingId || "").trim();
+      const explicitTarget = requestedBookingId
+        ? scheduleJobs.find((job) => String(job?.id || "").trim() === requestedBookingId)
+        : null;
+      const targetJob = explicitTarget || scheduleJobs[0];
+      if (!targetJob) return;
+
+      clearChatbotPendingAction();
+      setLocationJob(null);
+      setAutoStartShare(false);
+      setAutoStopShare(false);
+      setChatJob(targetJob);
+      setPendingChatAutomation({
+        id: String(payload.id || `chat-act-${Date.now()}`),
+        action: String(payload.action || ""),
+        replacementText: String(payload.replacementText || ""),
+        confirmed: payload.confirmed === true,
+        bookingId: String(targetJob.id || "")
+      });
+      return;
+    }
+
+    if (actionTypeRoot !== "worker_schedule_action") return;
 
     const payload = pendingAction.payload || {};
     const actionType = String(payload.action || "").toLowerCase();
@@ -43,12 +72,22 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
       setChatJob(null);
       setLocationJob(targetJob);
       setAutoStartShare(Boolean(payload.autoShare));
+      setAutoStopShare(false);
+      return;
+    }
+
+    if (actionType === "stop_share") {
+      setChatJob(null);
+      setLocationJob(targetJob);
+      setAutoStartShare(false);
+      setAutoStopShare(true);
       return;
     }
 
     if (actionType === "open_chat") {
       setLocationJob(null);
       setAutoStartShare(false);
+      setAutoStopShare(false);
       setChatJob(targetJob);
     }
   }, [scheduleJobs]);
@@ -98,6 +137,7 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
                           type="button"
                           onClick={() => {
                             setAutoStartShare(false);
+                            setAutoStopShare(false);
                             setLocationJob(job);
                           }}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
@@ -126,23 +166,30 @@ function WorkerSchedulePage({ scheduleJobs, authToken = "", userName = "" }) {
 
       <ChatModal
         open={chatJob != null}
-        onClose={() => setChatJob(null)}
+        onClose={() => {
+          setChatJob(null);
+          setPendingChatAutomation(null);
+        }}
         bookingId={chatJob?.id}
         senderName={userName}
         senderRole="worker"
         counterpartName={chatJob?.customer}
         authToken={authToken}
         bookingStatus={chatJob?.status}
+        automationAction={pendingChatAutomation}
+        onAutomationHandled={() => setPendingChatAutomation(null)}
       />
       <CustomerLocationModal
         open={locationJob != null}
         onClose={() => {
           setLocationJob(null);
           setAutoStartShare(false);
+          setAutoStopShare(false);
         }}
         booking={locationJob}
         authToken={authToken}
         autoStartSharing={autoStartShare}
+        autoStopSharing={autoStopShare}
       />
     </>
   );

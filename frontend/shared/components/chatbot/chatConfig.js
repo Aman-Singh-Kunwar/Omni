@@ -1,3 +1,10 @@
+/**
+ * chatConfig.js — Omni Chatbot Configuration (Upgraded)
+ *
+ * Role-specific themes, welcome messages, and post-navigation voice guidance.
+ * All navigation advice is in both English and Hindi.
+ */
+
 const CHAT_SESSION_PREFIX = "omni-chat-session-v1";
 const CHATBOT_BOOKING_ACTION_KEY = "omni:chatbot-pending-booking-action";
 const CHATBOT_PENDING_ACTION_KEY = "omni:chatbot-pending-action-v1";
@@ -43,119 +50,214 @@ const ROLE_THEME = {
 
 const WELCOME_MESSAGES = {
   landing: {
-    text: "Welcome! I am **Omni Guide** for the landing page.\n\nI can help you:\n- Choose the right role (Customer, Worker, Broker)\n- Understand available services\n- Start signup or login quickly",
+    text: "नमस्ते! 👋 मैं **Omni Guide** हूँ।\n\nHi! I'm Omni Guide.\n\nI can help you:\n- Choose your role (Customer, Worker, Broker)\n- Understand Omni services\n- Start signup or login\n- Answer any questions",
     actions: [
-      { label: "Start as Customer", action: "navigate", path: "/signup?role=customer" },
-      { label: "Worker Login", action: "navigate", path: "/login?role=worker" },
-      { label: "Which Role Fits Me?", action: "message", text: "Help me choose between customer, worker, and broker" }
+      { label: "Book Services (Customer)", action: "navigate", path: "/signup?role=customer" },
+      { label: "Provide Services (Worker)", action: "navigate", path: "/signup?role=worker" },
+      { label: "Which Role Suits Me?", action: "message", text: "Help me choose between customer, worker, and broker" }
     ]
   },
   customer: {
-    text: "Hi! I'm **Omni Assistant**.\n\nI can help you:\n- Book a service\n- Track bookings\n- Get recommendations\n- Check pricing",
+    text: "नमस्ते! 👋 मैं **Omni Assistant** हूँ।\n\nHi! I'm your Omni Assistant.\n\nI can help you:\n- 🔧 Book any service\n- 📋 Track your bookings\n- 💰 Check pricing & offers\n- ⭐ Submit reviews\n- 💬 Chat with workers\n- 📍 Track worker location",
     actions: [
-      { label: "My Bookings", action: "navigate", path: "/bookings" },
-      { label: "Book a Service", action: "message", text: "I want to book a service" },
-      { label: "Service Prices", action: "message", text: "What are your service prices?" }
+      { label: "📋 My Bookings", action: "navigate", path: "/bookings" },
+      { label: "🔧 Book a Service", action: "message", text: "I want to book a service" },
+      { label: "💰 Service Prices", action: "message", text: "What are the service prices?" }
     ]
   },
   worker: {
-    text: "Hi! I'm your **Worker Assistant**.\n\nI can help you:\n- View job requests\n- Check your schedule\n- Track earnings\n- View reviews",
+    text: "नमस्ते! 👋 मैं आपका **Worker Assistant** हूँ।\n\nHi! I'm your Worker Assistant.\n\nI can help you:\n- 📥 Manage job requests\n- 📅 Check your schedule\n- 💰 Track earnings\n- 🗺️ Share location with customers\n- 💬 Chat with customers\n- ⭐ View your reviews",
     actions: [
-      { label: "Job Requests", action: "navigate", path: "/job-requests" },
-      { label: "My Schedule", action: "navigate", path: "/schedule" },
-      { label: "My Earnings", action: "navigate", path: "/earnings" }
+      { label: "📥 Job Requests", action: "navigate", path: "/job-requests" },
+      { label: "📅 My Schedule", action: "navigate", path: "/schedule" },
+      { label: "💰 Earnings", action: "navigate", path: "/earnings" }
     ]
   },
   broker: {
-    text: "Hi! I'm your **Broker Assistant**.\n\nI can help you:\n- Manage workers\n- Check commissions\n- View bookings\n- Share broker code",
+    text: "नमस्ते! 👋 मैं आपका **Broker Assistant** हूँ।\n\nHi! I'm your Broker Assistant.\n\nI can help you:\n- 👥 Manage your worker network\n- 💰 Check commission earnings\n- 📋 View booking history\n- 🔗 Share broker code\n- 📊 Track worker performance",
     actions: [
-      { label: "My Workers", action: "navigate", path: "/workers" },
-      { label: "My Earnings", action: "navigate", path: "/earnings" },
-      { label: "Broker Code", action: "message", text: "How do I share my broker code?" }
+      { label: "👥 My Workers", action: "navigate", path: "/workers" },
+      { label: "💰 Earnings", action: "navigate", path: "/earnings" },
+      { label: "🔗 Broker Code", action: "message", text: "How do I share my broker code?" }
     ]
   }
 };
 
+/**
+ * Builds voice guidance text spoken AFTER navigating to a page.
+ * Called after route change so user knows what to do on the new page.
+ */
 function buildPostNavigationAdvice(pathname, selectedLanguage = "auto") {
-  const path = String(pathname || "").toLowerCase();
+  const path = String(pathname || "").toLowerCase().trim();
   const isHindi = selectedLanguage === "hi-IN";
 
-  if (path.startsWith("/bookings/new")) {
-    return isHindi
-      ? "बुकिंग पेज खुल गया है। पहला स्टेप, सर्विस और पेमेंट रिसीट देखें। दूसरा स्टेप, तारीख और समय चुनें। तीसरा स्टेप, लोकेशन भरें या Select on Map दबाएं। चौथा स्टेप, अपनी जरूरत Description में लिखें। पांचवां स्टेप, Book Service दबाकर कन्फर्म करें।"
-      : "Booking page is open. Step one, review service and payment receipt. Step two, select preferred date and time. Step three, set location or choose Select on Map. Step four, add your requirement in description. Step five, click Book Service to confirm.";
-  }
-
+  // ── LANDING SECTIONS ──────────────────────────────────────────────────────
   if (path === "/" || path === "") {
     return isHindi
-      ? "लैंडिंग पेज खुल गया है। यहां से आप रोल चुन सकते हैं और साइनअप शुरू कर सकते हैं।"
-      : "Landing page is open. From here you can choose your role and start signup.";
+      ? "Omni landing page खुल गया है। Customer, Worker, या Broker — अपना role चुनें और शुरू करें।"
+      : "Omni landing page is open. Choose your role — Customer, Worker, or Broker — and get started.";
+  }
+  if (path.includes("how-it-works")) {
+    return isHindi
+      ? "How It Works section खुल गया है। यहाँ Omni के तीन steps देख सकते हैं।"
+      : "How It Works section is open. You can see the three steps of how Omni works.";
+  }
+  if (path.includes("testimonials")) {
+    return isHindi
+      ? "User feedback section खुल गया है। Real customer और worker reviews यहाँ हैं।"
+      : "User testimonials section is open. Read real customer and worker reviews here.";
+  }
+  if (path.includes("faq")) {
+    return isHindi
+      ? "FAQs section खुल गया है। Common questions के answers यहाँ मिलेंगे।"
+      : "FAQs section is open. Find answers to common questions here.";
   }
 
+  // ── AUTH PAGES ────────────────────────────────────────────────────────────
   if (path.startsWith("/login")) {
     return isHindi
-      ? "लॉगिन पेज खुल गया है। अपना रोल चुनकर ईमेल और पासवर्ड से लॉगिन करें।"
-      : "Login page is open. Select your role and sign in with your email and password.";
+      ? "Login page खुल गया है। अपना role चुनकर email और password डालें, फिर Login दबाएं।"
+      : "Login page is open. Select your role, enter email and password, then tap Login.";
   }
-
   if (path.startsWith("/signup")) {
     return isHindi
-      ? "साइनअप पेज खुल गया है। अपना रोल चुनें और जरूरी जानकारी भरकर अकाउंट बनाएं।"
-      : "Signup page is open. Choose a role, fill your details, and create your account.";
+      ? "Signup page खुल गया है। Name, email, password भरें। Worker हैं तो referral code add कर सकते हैं। फिर Sign Up करें।"
+      : "Signup page is open. Fill in your name, email, and password. Workers can add a referral code. Then tap Sign Up.";
   }
 
-  if (path.includes("/service/")) {
+  // ── CUSTOMER PAGES ────────────────────────────────────────────────────────
+  if (path === "/bookings/new" || path.startsWith("/bookings/new")) {
     return isHindi
-      ? "सर्विस डिटेल पेज खुल गया है। पहला स्टेप, कोई प्लान चुनें। दूसरा स्टेप, जरूरत हो तो add-ons या offer चुनें। तीसरा स्टेप, Continue Booking दबाकर बुकिंग फॉर्म खोलें।"
-      : "Service details page is open. Step one, choose a plan. Step two, add optional add-ons or offers. Step three, click Continue Booking to open the booking form.";
+      ? "Booking form खुल गया है। Step 1: Service और payment receipt देखें। Step 2: Date और time choose करें। Step 3: Location type करें या map से select करें। Step 4: Description में requirement लिखें। Step 5: Book Service दबाकर confirm करें।"
+      : "Booking form is open. Step one: review service and payment. Step two: choose date and time. Step three: set your location or pick from map. Step four: add description. Step five: tap Book Service to confirm.";
   }
-
   if (path.startsWith("/bookings")) {
     return isHindi
-      ? "बुकिंग्स पेज खुल गया है। यहां आप स्टेटस ट्रैक कर सकते हैं, बुकिंग डिटेल देख सकते हैं और एक्टिव बुकिंग मैनेज कर सकते हैं।"
-      : "Bookings page is open. You can track status, check booking details, and manage active bookings here.";
+      ? "My Bookings page खुल गया है। यहाँ अपनी सभी bookings देख सकते हैं। Active bookings पर Cancel, Pay Now, Track Worker, और Chat buttons दिखेंगे।"
+      : "My Bookings page is open. You can see all your bookings here. Active bookings show Cancel, Pay Now, Track Worker, and Chat buttons.";
+  }
+  if (path.startsWith("/favorites")) {
+    return isHindi
+      ? "Favorites page खुल गया है। यहाँ saved workers हैं। Book Now button से directly book कर सकते हैं।"
+      : "Favorites page is open. Your saved workers are here. Tap Book Now to book directly.";
   }
 
+  // ── SERVICE CATEGORY PAGES ────────────────────────────────────────────────
+  if (path.includes("/customer/category/home-care/service/plumbing-support")) {
+    return isHindi
+      ? "Plumbing service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Plumbing service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/home-care/service/electrical-care")) {
+    return isHindi
+      ? "Electrical service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Electrical service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/home-care/service/ac-maintenance")) {
+    return isHindi
+      ? "AC Repair service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "AC Repair service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/home-care/service/house-cleaning")) {
+    return isHindi
+      ? "House Cleaning service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "House Cleaning service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/home-care/service/carpentry-care")) {
+    return isHindi
+      ? "Carpentry service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Carpentry service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/home-care/service/car-service")) {
+    return isHindi
+      ? "Car Service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Car Service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/personal-grooming/service/at-home-hair-styling")) {
+    return isHindi
+      ? "Hair Styling service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Hair Styling service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/personal-grooming/service/skin-glow-rituals")) {
+    return isHindi
+      ? "Skin Care service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Skin Care service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/vehicle-care/service/premium-car-wash")) {
+    return isHindi
+      ? "Car Wash service page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Car Wash service page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/customer/category/vehicle-care/service/interior-detailing")) {
+    return isHindi
+      ? "Car Interior Detailing page खुल गया है। Plan choose करें, फिर Continue Booking दबाएं।"
+      : "Car Interior Detailing page is open. Choose a plan, then tap Continue Booking.";
+  }
+  if (path.includes("/service/")) {
+    return isHindi
+      ? "Service detail page खुल गया है। Plan और add-ons choose करें, फिर Continue Booking दबाकर booking form खोलें।"
+      : "Service detail page is open. Choose a plan and add-ons, then tap Continue Booking to open the booking form.";
+  }
+  if (path.includes("/customer/category/home-care")) {
+    return isHindi
+      ? "Home Care category खुल गई है। Plumbing, Electrical, AC, Cleaning जैसी services यहाँ हैं। किसी पर tap करके details देखें।"
+      : "Home Care category is open. Services like Plumbing, Electrical, AC, Cleaning are here. Tap any service for details.";
+  }
+  if (path.includes("/customer/category/personal-grooming")) {
+    return isHindi
+      ? "Personal Grooming category खुल गई है। Hair Styling और Skin Care services यहाँ हैं।"
+      : "Personal Grooming category is open. Hair Styling and Skin Care services are here.";
+  }
+  if (path.includes("/customer/category/vehicle-care")) {
+    return isHindi
+      ? "Vehicle Care category खुल गई है। Car Wash और Interior Detailing services यहाँ हैं।"
+      : "Vehicle Care category is open. Car Wash and Interior Detailing services are here.";
+  }
+
+  // ── WORKER PAGES ──────────────────────────────────────────────────────────
   if (path.startsWith("/job-requests")) {
     return isHindi
-      ? "जॉब रिक्वेस्ट पेज खुल गया है। आप यहां नई रिक्वेस्ट स्वीकार या अस्वीकार कर सकते हैं।"
-      : "Job requests page is open. Review incoming requests and accept or reject them.";
+      ? "Job Requests page खुल गया है। हर pending request पर Accept या Decline button दिखेगा। Accept करने पर job आपके Schedule में चली जाएगी।"
+      : "Job Requests page is open. Each pending request shows Accept and Decline buttons. Accepting moves the job to your Schedule.";
   }
-
   if (path.startsWith("/schedule")) {
     return isHindi
-      ? "शेड्यूल पेज खुल गया है। यहां आप आज और आने वाले कन्फर्म्ड जॉब्स देख सकते हैं।"
-      : "Schedule page is open. Check today's and upcoming confirmed jobs here.";
+      ? "Schedule page खुल गया है। यहाँ confirmed और upcoming jobs हैं। हर job पर View Customer Location और Chat buttons हैं।"
+      : "Schedule page is open. Confirmed and upcoming jobs are here. Each job has View Customer Location and Chat buttons.";
   }
-
   if (path.startsWith("/earnings")) {
     return isHindi
-      ? "अर्निंग्स पेज खुल गया है। यहां आप कमाई, कमीशन और हाल की पेआउट डिटेल देख सकते हैं।"
-      : "Earnings page is open. Review income, commission details, and recent payouts.";
+      ? "Earnings page खुल गया है। Total earnings, completed jobs, और हर job की detail यहाँ है। Broker commission भी दिखेगा अगर linked है।"
+      : "Earnings page is open. Total earnings, completed jobs, and per-job details are here. Broker commission shown if linked.";
   }
-
   if (path.startsWith("/reviews")) {
     return isHindi
-      ? "रिव्यू पेज खुल गया है। यहां आप ग्राहक फीडबैक और रेटिंग देख सकते हैं।"
-      : "Reviews page is open. Check customer feedback and ratings here.";
+      ? "Reviews page खुल गया है। Customer ratings और feedback यहाँ देख सकते हैं।"
+      : "Reviews page is open. Customer ratings and written feedback are displayed here.";
+  }
+  if (path.startsWith("/job-profile")) {
+    return isHindi
+      ? "Job Profile page खुल गया है। यह वो profile है जो customers देखते हैं। Ratings, reviews, और completed jobs यहाँ दिखते हैं।"
+      : "Job Profile page is open. This is what customers see. Ratings, reviews, and completed jobs are shown here.";
   }
 
+  // ── BROKER PAGES ──────────────────────────────────────────────────────────
   if (path.startsWith("/workers")) {
     return isHindi
-      ? "वर्कर्स पेज खुल गया है। यहां आप अपने नेटवर्क के वर्कर्स और उनका परफॉर्मेंस देख सकते हैं।"
-      : "Workers page is open. View linked workers and their performance details.";
+      ? "Workers page खुल गया है। Linked workers की list है। हर worker के stats, jobs, rating, और आपकी commission यहाँ दिखती है।"
+      : "Workers page is open. All linked workers are listed with their stats, jobs, ratings, and your commission from each.";
   }
 
+  // ── SHARED PAGES ──────────────────────────────────────────────────────────
   if (path.startsWith("/profile")) {
     return isHindi
-      ? "प्रोफाइल पेज खुल गया है। यहां आप अपनी जानकारी और सेटिंग्स अपडेट कर सकते हैं।"
-      : "Profile page is open. You can update your account information and settings here.";
+      ? "Profile page खुल गया है। Name, email, phone, bio, photo यहाँ update कर सकते हैं। Email change करने पर OTP verify करना होगा। Save Changes दबाएं।"
+      : "Profile page is open. Update your name, email, phone, bio, and photo here. Email change requires OTP verification. Tap Save Changes.";
   }
-
   if (path.startsWith("/settings")) {
     return isHindi
-      ? "सेटिंग्स पेज खुल गया है। यहां ऐप प्रेफरेंस और अकाउंट विकल्प बदलें।"
-      : "Settings page is open. Manage app preferences and account options here.";
+      ? "Settings page खुल गया है। Notification preferences, password change, logout, और account deletion यहाँ है।"
+      : "Settings page is open. Manage notification preferences, change password, logout, or delete account here.";
   }
 
   return "";

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crosshair, Loader2, MapPin, Search, X } from "lucide-react";
+import { Check, Crosshair, Home, Loader2, MapPin, Search, Trash2, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import MapCanvas from "./location-picker/MapCanvas";
 import { DEFAULT_CENTER, TILE_STYLES } from "./location-picker/constants";
@@ -18,10 +18,28 @@ function LocationPickerModal({ open, initialLabel = "", initialPosition = null, 
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [mapHovered, setMapHovered] = useState(false);
+  const [copiedCoords, setCopiedCoords] = useState(false);
+  const [homeLocation, setHomeLocation] = useState(() => {
+    try {
+      const saved = localStorage.getItem('home_location');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [workLocation, setWorkLocation] = useState(() => {
+    try {
+      const saved = localStorage.getItem('work_location');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const lookupRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
   const modalCardRef = useRef(null);
   const modalContentScrollRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
 
   const normalizedInitialPosition = useMemo(() => normalizePosition(initialPosition) || DEFAULT_CENTER, [initialPosition]);
   const hasSelection = Boolean(normalizePosition(selectedPosition));
@@ -113,6 +131,67 @@ function LocationPickerModal({ open, initialLabel = "", initialPosition = null, 
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, [handleSelectPosition]);
+
+  const handleCopyCoordinates = useCallback(async () => {
+    const normalized = normalizePosition(selectedPosition);
+    if (!normalized) return;
+    
+    const coordText = toCoordinateLabel(normalized);
+    try {
+      await navigator.clipboard.writeText(coordText);
+      setCopiedCoords(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedCoords(false), 2000);
+    } catch {
+      setLocationError("Failed to copy coordinates");
+    }
+  }, [selectedPosition]);
+
+  const handleSetHomeLocation = useCallback(() => {
+    const normalized = normalizePosition(selectedPosition);
+    if (!normalized) return;
+    
+    try {
+      const homeData = {
+        lat: normalized.lat,
+        lng: normalized.lng,
+        label: selectedLabel || toCoordinateLabel(normalized)
+      };
+      localStorage.setItem('home_location', JSON.stringify(homeData));
+      setHomeLocation(homeData);
+      setLocationError("");
+    } catch {
+      setLocationError("Failed to save home location");
+    }
+  }, [selectedPosition, selectedLabel]);
+
+  const handleSetWorkLocation = useCallback(() => {
+    const normalized = normalizePosition(selectedPosition);
+    if (!normalized) return;
+    
+    try {
+      const workData = {
+        lat: normalized.lat,
+        lng: normalized.lng,
+        label: selectedLabel || toCoordinateLabel(normalized)
+      };
+      localStorage.setItem('work_location', JSON.stringify(workData));
+      setWorkLocation(workData);
+      setLocationError("");
+    } catch {
+      setLocationError("Failed to save work location");
+    }
+  }, [selectedPosition, selectedLabel]);
+
+  const handleClearHomeLocation = useCallback(() => {
+    localStorage.removeItem('home_location');
+    setHomeLocation(null);
+  }, []);
+
+  const handleClearWorkLocation = useCallback(() => {
+    localStorage.removeItem('work_location');
+    setWorkLocation(null);
+  }, []);
 
   const handleConfirm = () => {
     const normalized = normalizePosition(selectedPosition);
@@ -360,44 +439,119 @@ function LocationPickerModal({ open, initialLabel = "", initialPosition = null, 
               onMapMouseLeave={() => setMapHovered(false)}
             />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1">
-                {Object.entries(TILE_STYLES).map(([key, style]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setMapStyle(key)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold ui-touch-target ${
-                      mapStyle === key ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    {style.label}
-                  </button>
-                ))}
+            <div className="space-y-3">
+              {/* Shortcut locations */}
+              <div className="flex flex-wrap gap-2">
+                {homeLocation && (
+                  <div className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPosition(homeLocation)}
+                      className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                    >
+                      🏠 Home
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearHomeLocation}
+                      className="p-0.5 text-amber-600 hover:text-amber-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                {workLocation && (
+                  <div className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPosition(workLocation)}
+                      className="text-xs font-medium text-purple-700 hover:text-purple-800"
+                    >
+                      💼 Work
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearWorkLocation}
+                      className="p-0.5 text-purple-600 hover:text-purple-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-full border border-blue-300 bg-blue-500/90" />
-                  Current location pin
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-blue-600" />
-                  Selected location pin
-                </span>
+
+              {/* Map controls and styles */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1">
+                  {Object.entries(TILE_STYLES).map(([key, style]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMapStyle(key)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ui-touch-target ${
+                        mapStyle === key ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-blue-300 bg-blue-500/90" />
+                    Current location pin
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    Selected location pin
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleUseCurrentLocation}
-                disabled={locating}
-                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-70 ui-touch-target"
-              >
-                {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
-                {locating ? "Locating..." : "Use Current Location"}
-              </button>
-              <p className="text-xs text-slate-500">Selected pin: {toCoordinateLabel(selectedPosition)}</p>
-              <p className="text-xs text-slate-400">
-                {mapHovered ? "Mouse wheel zoom active on map." : "Hover map to enable mouse wheel zoom."}
-              </p>
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-70 ui-touch-target"
+                >
+                  {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Locate</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyCoordinates}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 ui-touch-target"
+                >
+                  {copiedCoords ? <Check className="h-4 w-4 text-green-600" /> : <MapPin className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{copiedCoords ? "Copied" : "Copy"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSetHomeLocation}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 ui-touch-target"
+                >
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Home</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSetWorkLocation}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-2 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 ui-touch-target"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Work</span>
+                </button>
+              </div>
+
+              {/* Coordinate display */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-slate-600">Selected: {toCoordinateLabel(selectedPosition)}</p>
+                <p className="text-xs text-slate-400">
+                  {mapHovered ? "Mouse wheel zoom active on map." : "Hover map to enable mouse wheel zoom."}
+                </p>
+              </div>
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -407,7 +561,14 @@ function LocationPickerModal({ open, initialLabel = "", initialPosition = null, 
               </p>
             </div>
 
-            {locationError && <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>}
+            {locationError && (
+              <div className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700 flex align-center justify-between">
+                <span>{locationError}</span>
+                {locationError.includes("location") && (
+                  <button onClick={handleUseCurrentLocation} className="text-amber-900 font-semibold underline">Retry</button>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button

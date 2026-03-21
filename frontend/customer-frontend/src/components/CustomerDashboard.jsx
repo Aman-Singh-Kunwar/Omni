@@ -21,6 +21,7 @@ import { formatInr, getRandomServicePrice, toFavoriteProvider } from "./customer
 import useCustomerProfile from "./customer-dashboard/useCustomerProfile";
 import useCustomerNotifications from "./customer-dashboard/useCustomerNotifications";
 import useCustomerBookingActions from "./customer-dashboard/useCustomerBookingActions";
+import { clearChatbotPendingAction, readChatbotPendingAction } from "@shared/components/chatbot/sessionStorage";
 
 const CustomerHomePage = lazy(() => import('../pages/customer/CustomerHomePage'));
 const CustomerBookingFormPage = lazy(() => import('../pages/customer/CustomerBookingFormPage'));
@@ -168,8 +169,10 @@ const CustomerDashboard = ({
     const params = new URLSearchParams(location.search);
     const rawPrice = Number(params.get('price'));
     const rawOfferDiscount = Number(params.get('discount'));
+    const rawApplyDiscount = String(params.get('applyDiscount') || '').trim().toLowerCase();
     const parsedPrice = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round(rawPrice) : 0;
     const parsedOfferDiscount = Number.isFinite(rawOfferDiscount) && rawOfferDiscount > 0 ? Math.round(rawOfferDiscount) : 0;
+    const parsedApplyDiscount = rawApplyDiscount === 'false' || rawApplyDiscount === '0' ? false : rawApplyDiscount === 'true' || rawApplyDiscount === '1' ? true : null;
     const rawAddons = String(params.get('addons') || '').split(',').map((item) => item.trim()).filter(Boolean);
     return {
       source: params.get('source') === 'worker' ? 'worker' : 'service',
@@ -179,7 +182,9 @@ const CustomerDashboard = ({
       addons: rawAddons,
       offer: String(params.get('offer') || '').trim(),
       discount: parsedOfferDiscount,
-      price: parsedPrice
+      price: parsedPrice,
+      applyDiscount: parsedApplyDiscount,
+      isRebook: params.get('rebook') === '1'
     };
   }, [location.search]);
 
@@ -300,11 +305,22 @@ const CustomerDashboard = ({
     const workerIdFromQuery = bookingSource === 'worker' ? bookingQuery.workerId : '';
     const serviceFromQuery = bookingSource === 'worker' ? bookingQuery.service : '';
     setBookingForm((prev) => ({
-      ...prev, date: prev.date || today, workerId: workerIdFromQuery || '',
-      service: bookingSource === 'worker' ? serviceFromQuery : prev.service
+      ...prev,
+      date: bookingQuery.isRebook ? '' : (prev.date || today),
+      time: bookingQuery.isRebook ? '' : prev.time,
+      location: bookingQuery.isRebook ? '' : prev.location,
+      locationLat: bookingQuery.isRebook ? '' : prev.locationLat,
+      locationLng: bookingQuery.isRebook ? '' : prev.locationLng,
+      description: bookingQuery.isRebook ? '' : prev.description,
+      workerId: workerIdFromQuery || '',
+      service: bookingSource === 'worker' ? serviceFromQuery : prev.service,
+      applyDiscount:
+        bookingSource === 'service' && typeof bookingQuery.applyDiscount === 'boolean'
+          ? bookingQuery.applyDiscount
+          : prev.applyDiscount
     }));
     setBookingStatus({ loading: false, error: '' });
-  }, [activeTab, bookingSource, bookingQuery.workerId, bookingQuery.service]);
+  }, [activeTab, bookingSource, bookingQuery.applyDiscount, bookingQuery.isRebook, bookingQuery.workerId, bookingQuery.service]);
 
   useEffect(() => {
     if (activeTab !== 'bookService') return;
@@ -475,6 +491,9 @@ const CustomerDashboard = ({
               .filter((media) => media.dataUrl)
             : [],
           amount: Number(booking.amount || 0),
+          originalAmount: Number(booking.originalAmount || 0),
+          discountAmount: Number(booking.discountAmount || 0),
+          discountPercent: Number(booking.discountPercent || 0),
           createdAt: booking.createdAt || ''
         }))
         : [];
@@ -609,6 +628,89 @@ const CustomerDashboard = ({
       setRoleSwitchStatus({ loading: false, error: error.response?.data?.message || 'Unable to switch role right now.' });
     }
   };
+
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (!pendingAction || typeof pendingAction !== "object") return;
+
+    if (pendingAction.type === "profile_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["email", "phone", "bio"].includes(section) ? section : "email";
+      navigate(`/profile?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "settings_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["notifications", "password", "delete-account"].includes(section)
+        ? section
+        : "notifications";
+      navigate(`/settings?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "dashboard_notification_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "mark_all_read") {
+        handleMarkAllNotificationsRead();
+        return;
+      }
+      if (actionType === "clear_all") {
+        handleClearNotifications();
+        return;
+      }
+
+      if (actionType === "open_unread_target") {
+        const readSet = new Set(readNotificationIds.map((id) => toStableId(id)).filter(Boolean));
+        const firstUnread = visibleNotificationItems.find((item) => !readSet.has(toStableId(item?.id)));
+        if (firstUnread) {
+          const normalizedId = toStableId(firstUnread.id);
+          if (normalizedId) {
+            handleMarkNotificationRead(normalizedId);
+          }
+          setShowNotifications(false);
+          const preferredTab = String(firstUnread.targetTab || "").trim();
+          if (preferredTab && TAB_PATH_MAP[preferredTab]) {
+            navigateToTab(preferredTab);
+          }
+          return;
+        }
+      }
+
+      setShowUserMenu(false);
+      setShowMobileMenu(false);
+      setShowNotifications(true);
+      return;
+    }
+
+    if (pendingAction.type === "role_switch_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const targetRole = String(pendingAction?.payload?.role || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "switch_role" && ["worker", "broker"].includes(targetRole)) {
+        handleRoleSwitch(targetRole);
+        return;
+      }
+
+      setRoleSwitchStatus({ loading: false, error: "" });
+      setShowUserMenu(false);
+      setShowRoleSwitchModal(true);
+    }
+  }, [
+    handleClearNotifications,
+    handleMarkAllNotificationsRead,
+    handleMarkNotificationRead,
+    handleRoleSwitch,
+    navigate,
+    navigateToTab,
+    readNotificationIds,
+    visibleNotificationItems
+  ]);
 
   const handleBookService = async () => {
     if (!authToken) { setBookingStatus({ loading: false, error: 'Please log in to book a service.' }); return; }
@@ -774,7 +876,7 @@ const CustomerDashboard = ({
           onRequestEmailVerification={requestEmailVerification} onVerifyEmailChange={verifyEmailChange} />
       );
     }
-    return <CustomerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} />;
+    return <CustomerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} userEmail={userEmail} />;
   };
 
   return (

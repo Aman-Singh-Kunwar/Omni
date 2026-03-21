@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -56,6 +56,16 @@ function findEligibleBooking(bookings, requestedBookingId, eligibleStatuses) {
   return (
     normalizedBookings.find((booking) => eligibleStatuses.has(String(booking?.status || "").toLowerCase())) || null
   );
+}
+
+function findBookingByIdOrFirst(bookings, requestedBookingId) {
+  const requestedId = String(requestedBookingId || "").trim();
+  const normalizedBookings = Array.isArray(bookings) ? bookings : [];
+  if (requestedId) {
+    const exactMatch = normalizedBookings.find((booking) => String(booking?.id || booking?._id || "").trim() === requestedId);
+    if (exactMatch) return exactMatch;
+  }
+  return normalizedBookings[0] || null;
 }
 
 const SERVICE_VISUALS = [
@@ -176,6 +186,16 @@ function CustomerBookingsPage({
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [openReviewByBookingId, setOpenReviewByBookingId] = useState({});
   const [reviewMediaErrors, setReviewMediaErrors] = useState({});
+  const [highlightedBookingId, setHighlightedBookingId] = useState("");
+  const [pendingChatAutomation, setPendingChatAutomation] = useState(null);
+  const [reviewMediaPromptBookingId, setReviewMediaPromptBookingId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [cancelConfirm, setCancelConfirm] = useState(null);
+  const bookingCardRefs = useRef({});
+  const reviewMediaPickerRefs = useRef({});
 
   const handleBackClick = () => {
     if (window.history.length > 1) {
@@ -185,6 +205,29 @@ function CustomerBookingsPage({
     navigate("/");
   };
 
+  const handleBookAgain = (booking) => {
+    const serviceName = String(booking?.service || "").trim();
+    if (!serviceName) {
+      return;
+    }
+
+    const originalAmount = Number(booking?.originalAmount || 0);
+    const fallbackAmount = Number(booking?.amount || 0);
+    const selectedPrice = Number.isFinite(originalAmount) && originalAmount > 0 ? Math.round(originalAmount) : Number.isFinite(fallbackAmount) && fallbackAmount > 0 ? Math.round(fallbackAmount) : 0;
+    const hasDiscount = Number(booking?.discountAmount || 0) > 0 || Number(booking?.discountPercent || 0) > 0;
+
+    const params = new URLSearchParams();
+    params.set("source", "service");
+    params.set("service", serviceName);
+    if (selectedPrice > 0) {
+      params.set("price", String(selectedPrice));
+    }
+    params.set("applyDiscount", hasDiscount ? "true" : "false");
+    params.set("rebook", "1");
+
+    navigate(`/bookings/new?${params.toString()}`);
+  };
+
   useEffect(() => {
     const timerId = window.setInterval(() => setNowTs(Date.now()), 1000);
     return () => window.clearInterval(timerId);
@@ -192,15 +235,51 @@ function CustomerBookingsPage({
 
   useEffect(() => {
     const pendingAction = readChatbotPendingAction();
-    if (pendingAction?.type !== "customer_bookings_action") return;
+    const actionTypeRoot = String(pendingAction?.type || "").toLowerCase();
+    if (!actionTypeRoot) return;
 
     if (!Array.isArray(recentBookings) || recentBookings.length === 0) {
       return;
     }
 
+    if (actionTypeRoot === "chat_message_action") {
+      const payload = pendingAction.payload || {};
+      const requestedBookingId = String(payload.bookingId || "").trim();
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, chatEligibleStatuses);
+      if (!targetBooking) return;
+
+      clearChatbotPendingAction();
+      setTrackingBooking(null);
+      setChatBooking(targetBooking);
+      setPendingChatAutomation({
+        id: String(payload.id || `chat-act-${Date.now()}`),
+        action: String(payload.action || ""),
+        replacementText: String(payload.replacementText || ""),
+        confirmed: payload.confirmed === true,
+        bookingId: String(targetBooking.id || "")
+      });
+      return;
+    }
+
+    if (actionTypeRoot !== "customer_bookings_action") return;
+
     const payload = pendingAction.payload || {};
     const actionType = String(payload.action || "").toLowerCase();
     const requestedBookingId = String(payload.bookingId || "").trim();
+
+    const focusBookingCard = (bookingId) => {
+      const targetId = String(bookingId || "").trim();
+      if (!targetId) return;
+
+      setHighlightedBookingId(targetId);
+      window.setTimeout(() => {
+        const node = bookingCardRefs.current[targetId];
+        node?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 120);
+      window.setTimeout(() => {
+        setHighlightedBookingId((prev) => (prev === targetId ? "" : prev));
+      }, 2600);
+    };
 
     clearChatbotPendingAction();
 
@@ -217,8 +296,108 @@ function CustomerBookingsPage({
       if (!targetBooking) return;
       setTrackingBooking(null);
       setChatBooking(targetBooking);
+      return;
     }
-  }, [recentBookings]);
+
+    if (actionType === "open_payment") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, cancelEligibleStatuses);
+      if (!targetBooking?.id) return;
+      onPayBooking?.(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_not_provided") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, cancelEligibleStatuses);
+      if (!targetBooking?.id) return;
+      onMarkServiceNotProvided?.(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_review") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, reviewEligibleStatuses);
+      if (!targetBooking?.id) return;
+      setChatBooking(null);
+      setTrackingBooking(null);
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [targetBooking.id]: createDraftFromBooking(targetBooking)
+      }));
+      setOpenReviewByBookingId((prev) => ({
+        ...prev,
+        [targetBooking.id]: true
+      }));
+      setReviewMediaPromptBookingId("");
+      focusBookingCard(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_review_tab") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, reviewEligibleStatuses);
+      if (!targetBooking?.id) return;
+      setChatBooking(null);
+      setTrackingBooking(null);
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [targetBooking.id]: createDraftFromBooking(targetBooking)
+      }));
+      setOpenReviewByBookingId((prev) => ({
+        ...prev,
+        [targetBooking.id]: true
+      }));
+      setReviewMediaPromptBookingId("");
+      focusBookingCard(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_review_media") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, reviewEligibleStatuses);
+      if (!targetBooking?.id) return;
+      setChatBooking(null);
+      setTrackingBooking(null);
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [targetBooking.id]: createDraftFromBooking(targetBooking)
+      }));
+      setOpenReviewByBookingId((prev) => ({
+        ...prev,
+        [targetBooking.id]: true
+      }));
+      setReviewMediaPromptBookingId(targetBooking.id);
+      focusBookingCard(targetBooking.id);
+      window.setTimeout(() => {
+        const pickerNode = reviewMediaPickerRefs.current[targetBooking.id];
+        pickerNode?.focus();
+      }, 220);
+      return;
+    }
+
+    if (actionType === "open_booking_details") {
+      const targetBooking = findBookingByIdOrFirst(recentBookings, requestedBookingId);
+      if (!targetBooking?.id) return;
+      setChatBooking(null);
+      setTrackingBooking(null);
+      focusBookingCard(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_delete") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, new Set(["pending", "confirmed", "upcoming", "in-progress", "completed", "cancelled", "not-provided", "failed"]));
+      if (!targetBooking?.id) return;
+      onDeleteBooking?.(targetBooking.id);
+      return;
+    }
+
+    if (actionType === "open_cancel") {
+      const targetBooking = findEligibleBooking(recentBookings, requestedBookingId, cancelEligibleStatuses);
+      if (!targetBooking?.id) return;
+
+      const createdAtTs = new Date(targetBooking.createdAt || "").getTime();
+      const remainingMs = Number.isFinite(createdAtTs) ? createdAtTs + CANCEL_WINDOW_MS - Date.now() : 0;
+      if (remainingMs <= 0) return;
+
+      onCancelBooking?.(targetBooking.id);
+    }
+  }, [recentBookings, onCancelBooking, onDeleteBooking, onMarkServiceNotProvided, onPayBooking]);
 
   const getRemainingMs = (booking) => {
     const createdAtTs = new Date(booking.createdAt || "").getTime();
@@ -345,6 +524,35 @@ function CustomerBookingsPage({
     }));
   };
 
+  // Filter and sort logic
+  const filteredBookings = useMemo(() => {
+    let result = Array.isArray(recentBookings) ? [...recentBookings] : [];
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      result = result.filter(b => b.status === statusFilter);
+    }
+
+    // Apply search filter (by service and provider name)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(b =>
+        (b.service && b.service.toLowerCase().includes(query)) ||
+        (b.provider && b.provider.toLowerCase().includes(query))
+      );
+    }
+
+    // Apply sort
+    if (sortBy === "oldest") {
+      result.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    } else {
+      // newest (default)
+      result.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    return result;
+  }, [recentBookings, statusFilter, searchQuery, sortBy]);
+
   return (
     <>
       <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
@@ -365,8 +573,63 @@ function CustomerBookingsPage({
         {deleteError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{deleteError}</p>}
         {reviewError && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-700">{reviewError}</p>}
 
+        {/* Filter and Search Controls */}
+        <div className="mb-6 space-y-4">
+          {/* Status Filter Chips */}
+          <div className="flex flex-wrap gap-2">
+            {["all", "pending", "confirmed", "upcoming", "in-progress", "completed", "not-provided"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  statusFilter === status
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {status === "all" ? "All Bookings" : formatStatusLabel(status)}
+              </button>
+            ))}
+          </div>
+
+          {/* Search and Sort Row */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              placeholder="Search by service or worker name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+
+          {/* Results count */}
+          {searchQuery && (
+            <p className="text-xs text-gray-500">
+              Found {filteredBookings.length} result{filteredBookings.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
         <div className="space-y-4">
-          {recentBookings.map((booking) => {
+          {filteredBookings.length === 0 ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
+              <p className="text-gray-600">
+                {recentBookings.length === 0
+                  ? "No bookings yet. Start by booking a service!"
+                  : "No bookings match your filters."}
+              </p>
+            </div>
+          ) : (
+            filteredBookings.map((booking) => {
             const serviceVisual = getServiceVisual(booking.service);
             const ServiceIcon = serviceVisual.icon;
             const hasExistingReview = Boolean(
@@ -376,7 +639,19 @@ function CustomerBookingsPage({
             );
 
             return (
-              <div key={booking.id} className="border p-4 sm:p-6 rounded-lg bg-white/60">
+              <div
+                key={booking.id}
+                ref={(node) => {
+                  if (node) {
+                    bookingCardRefs.current[booking.id] = node;
+                    return;
+                  }
+                  delete bookingCardRefs.current[booking.id];
+                }}
+                className={`border p-4 sm:p-6 rounded-lg bg-white/60 transition-shadow ${
+                  highlightedBookingId === booking.id ? "ring-2 ring-blue-400 shadow-md" : ""
+                }`}
+              >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex w-full min-w-0 items-center space-x-3 sm:space-x-4">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${serviceVisual.containerClass}`}>
@@ -412,9 +687,12 @@ function CustomerBookingsPage({
                   <div className="w-full sm:w-auto text-left sm:text-right">
                     {booking.rating && <div className="mt-2 flex items-center sm:hidden">{renderStars(booking.rating)}</div>}
 
-                    {(trackEligibleStatuses.has(booking.status) || chatEligibleStatuses.has(booking.status)) && booking.workerId && (
-                      <div className="mt-2 flex justify-between gap-2 sm:hidden w-full">
-                        {trackEligibleStatuses.has(booking.status) && (
+                    {((trackEligibleStatuses.has(booking.status) && booking.workerId) ||
+                      (chatEligibleStatuses.has(booking.status) && booking.workerId) ||
+                      booking.status === "completed" ||
+                      booking.status === "cancelled") && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden w-full">
+                        {trackEligibleStatuses.has(booking.status) && booking.workerId && (
                           <button
                             type="button"
                             onClick={() => setTrackingBooking(booking)}
@@ -424,7 +702,7 @@ function CustomerBookingsPage({
                             Track Worker
                           </button>
                         )}
-                        {chatEligibleStatuses.has(booking.status) && (
+                        {chatEligibleStatuses.has(booking.status) && booking.workerId && (
                           <button
                             type="button"
                             onClick={() => setChatBooking(booking)}
@@ -432,6 +710,15 @@ function CustomerBookingsPage({
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             Chat
+                          </button>
+                        )}
+                        {(booking.status === "completed" || booking.status === "cancelled") && (
+                          <button
+                            type="button"
+                            onClick={() => handleBookAgain(booking)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Book Again
                           </button>
                         )}
                       </div>
@@ -499,6 +786,15 @@ function CustomerBookingsPage({
                         >
                           <MessageCircle className="h-3.5 w-3.5" />
                           Chat
+                        </button>
+                      )}
+                      {(booking.status === "completed" || booking.status === "cancelled") && (
+                        <button
+                          type="button"
+                          onClick={() => handleBookAgain(booking)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Book Again
                         </button>
                       )}
                       {booking.rating && <div className="flex items-center">{renderStars(booking.rating)}</div>}
@@ -617,7 +913,21 @@ function CustomerBookingsPage({
                           ? ` (${reviewDrafts[booking.id].feedbackMedia.length} uploaded)`
                           : ""}
                       </label>
-                      <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-3 text-sm font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700">
+                      <label
+                        ref={(node) => {
+                          if (node) {
+                            reviewMediaPickerRefs.current[booking.id] = node;
+                            return;
+                          }
+                          delete reviewMediaPickerRefs.current[booking.id];
+                        }}
+                        tabIndex={0}
+                        className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 text-sm font-medium transition-colors ${
+                          reviewMediaPromptBookingId === booking.id
+                            ? "border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200"
+                            : "border-gray-300 bg-gray-50 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                        }`}
+                      >
                         <ImagePlus className="h-4 w-4" />
                         Upload Media
                         <input
@@ -632,6 +942,11 @@ function CustomerBookingsPage({
                           }}
                         />
                       </label>
+                      {reviewMediaPromptBookingId === booking.id && (
+                        <p className="text-xs font-medium text-blue-700">
+                          Chatbot opened this review for media upload. Tap Upload Media to pick files.
+                        </p>
+                      )}
                       <p className="text-xs text-gray-500">Up to 4 files. Image max 3MB each, video max 8MB each, total media max 10MB.</p>
                       {reviewMediaErrors[booking.id] && <p className="text-xs font-medium text-red-600">{reviewMediaErrors[booking.id]}</p>}
 
@@ -698,9 +1013,8 @@ function CustomerBookingsPage({
                 )}
               </div>
             );
-          })}
-
-          {recentBookings.length === 0 && <p className="text-sm text-gray-500">No bookings found for this account.</p>}
+            })
+          )}
         </div>
       </div>
 
@@ -713,6 +1027,8 @@ function CustomerBookingsPage({
         counterpartName={chatBooking?.provider}
         authToken={authToken}
         bookingStatus={chatBooking?.status}
+        automationAction={pendingChatAutomation}
+        onAutomationHandled={() => setPendingChatAutomation(null)}
       />
       <LiveTrackingModal
         open={trackingBooking != null}

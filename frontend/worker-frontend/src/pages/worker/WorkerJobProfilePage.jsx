@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, Star, UserCheck, Wrench } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Star, UserCheck, Wrench, Clock, CheckCircle, XCircle, Award, Pin } from "lucide-react";
 import ReviewMediaCarousel from "@shared/components/ReviewMediaCarousel";
 import ReviewMediaGallerySection from "@shared/components/ReviewMediaGallerySection";
 import ReviewRatingSummary from "@shared/components/ReviewRatingSummary";
@@ -210,8 +210,13 @@ function WorkerJobProfilePage({ authToken = "", defaultWorkerId = "", defaultWor
         <ReviewMediaGallerySection className="mb-6" reviews={detailedReviews} />
 
         <div className="space-y-3">
-          {detailedReviews.map((review) => (
-            <article key={review.id} className="rounded-xl border border-gray-200 bg-white p-4">
+          {detailedReviews.sort((a,b) => b.rating - a.rating || new Date(b.createdAt) - new Date(a.createdAt)).map((review, idx) => { const isTopPinned = idx < 2 && review.rating >= 4; return (
+            <article key={review.id} className={`relative overflow-hidden rounded-xl border ${isTopPinned ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 bg-white'} p-4`}>
+                    {isTopPinned && (
+                      <div className="absolute top-0 right-0 rounded-bl-xl bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                        <Pin className="h-3 w-3" /> Top Review
+                      </div>
+                    )}
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900">{review.customerName}</p>
@@ -239,7 +244,8 @@ function WorkerJobProfilePage({ authToken = "", defaultWorkerId = "", defaultWor
                 )}
               </div>
             </article>
-          ))}
+              );
+              })}
           {!detailedReviews.length && <p className="text-sm text-gray-500">No reviews available yet.</p>}
         </div>
       </section>

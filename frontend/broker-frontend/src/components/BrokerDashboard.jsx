@@ -12,6 +12,7 @@ import { landingUrl } from "./broker-dashboard/constants";
 import useBrokerDashboardData from "./broker-dashboard/useBrokerDashboardData";
 import useBrokerProfile from "./broker-dashboard/useBrokerProfile";
 import useBrokerNotifications from "./broker-dashboard/useBrokerNotifications";
+import { clearChatbotPendingAction, readChatbotPendingAction } from "@shared/components/chatbot/sessionStorage";
 
 const BrokerOverviewPage = lazy(() => import("../pages/broker/BrokerOverviewPage"));
 const BrokerWorkersPage = lazy(() => import("../pages/broker/BrokerWorkersPage"));
@@ -116,6 +117,16 @@ const BrokerDashboard = ({
     }
   };
 
+  const handleOpenWorkerJobProfile = useCallback((worker) => {
+    const workerId = String(worker?.id || "").trim();
+    const workerName = String(worker?.name || "").trim();
+    if (!workerId && !workerName) return;
+    const params = new URLSearchParams();
+    if (workerId) params.set("workerId", workerId);
+    if (workerName) params.set("workerName", workerName);
+    navigate(`/worker-profile${params.toString() ? `?${params.toString()}` : ""}`);
+  }, [navigate]);
+
   const hideUserMenu = useCallback(() => setShowUserMenu(false), []);
   const hideNotifications = useCallback(() => setShowNotifications(false), [setShowNotifications]);
   const hideMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
@@ -167,15 +178,189 @@ const BrokerDashboard = ({
     }
   };
 
-  const handleOpenWorkerJobProfile = (worker) => {
-    const workerId = String(worker?.id || "").trim();
-    const workerName = String(worker?.name || "").trim();
-    if (!workerId && !workerName) return;
-    const params = new URLSearchParams();
-    if (workerId) params.set("workerId", workerId);
-    if (workerName) params.set("workerName", workerName);
-    navigate(`/worker-profile${params.toString() ? `?${params.toString()}` : ""}`);
-  };
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (!pendingAction || typeof pendingAction !== "object") return;
+
+    if (pendingAction.type === "profile_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["email", "phone", "bio"].includes(section) ? section : "email";
+      navigate(`/profile?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "settings_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["notifications", "password", "delete-account"].includes(section)
+        ? section
+        : "notifications";
+      navigate(`/settings?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "broker_profile_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const pendingEmail = String(pendingAction?.payload?.pendingEmail || profileForm?.email || "").trim().toLowerCase();
+      const otpCode = String(pendingAction?.payload?.otpCode || "").replace(/\D/g, "").slice(0, 6);
+      const confirmed = pendingAction?.payload?.confirmed === true;
+      clearChatbotPendingAction();
+
+      navigateToTab("profile");
+
+      if (actionType === "open_email_verify") {
+        setEmailVerification((prev) => ({
+          ...prev,
+          open: true,
+          pendingEmail: pendingEmail || prev.pendingEmail || "",
+          code: "",
+          info: "",
+          error: ""
+        }));
+        return;
+      }
+
+      if (actionType === "resend_email_otp") {
+        if (pendingEmail) {
+          requestEmailVerification(pendingEmail);
+        }
+        return;
+      }
+
+      if (actionType === "verify_email_otp") {
+        if (!pendingEmail) {
+          setEmailVerification((prev) => ({
+            ...prev,
+            open: true,
+            error: "Email is required to verify OTP. Please provide the target email.",
+            info: ""
+          }));
+          return;
+        }
+
+        if (!confirmed || otpCode.length !== 6) {
+          setEmailVerification((prev) => ({
+            ...prev,
+            open: true,
+            pendingEmail,
+            code: otpCode || prev.code || "",
+            error: "For safety, confirm explicitly: 'confirm verify otp 123456'.",
+            info: ""
+          }));
+          return;
+        }
+
+        verifyEmailChange(pendingEmail, otpCode);
+      }
+
+      return;
+    }
+
+    if (pendingAction.type === "dashboard_notification_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "mark_all_read") {
+        handleMarkAllNotificationsRead();
+        return;
+      }
+      if (actionType === "clear_all") {
+        handleClearNotifications();
+        return;
+      }
+
+      if (actionType === "open_unread_target") {
+        const readSet = new Set(readNotificationIds.map((id) => toStableId(id)).filter(Boolean));
+        const firstUnread = visibleNotificationItems.find((item) => !readSet.has(toStableId(item?.id)));
+        if (firstUnread) {
+          const normalizedId = toStableId(firstUnread.id);
+          if (normalizedId) {
+            handleMarkNotificationRead(normalizedId);
+          }
+          setShowNotifications(false);
+          const preferredTab = String(firstUnread.targetTab || "").trim();
+          if (preferredTab && TAB_PATH_MAP[preferredTab]) {
+            navigateToTab(preferredTab);
+          }
+          return;
+        }
+      }
+
+      setShowUserMenu(false);
+      setIsMobileMenuOpen(false);
+      setShowNotifications(true);
+      return;
+    }
+
+    if (pendingAction.type === "role_switch_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const targetRole = String(pendingAction?.payload?.role || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "switch_role" && ["customer", "worker"].includes(targetRole)) {
+        handleRoleSwitch(targetRole);
+        return;
+      }
+
+      setRoleSwitchStatus({ loading: false, error: "" });
+      setShowUserMenu(false);
+      setShowRoleSwitchModal(true);
+      return;
+    }
+
+    if (pendingAction.type === "broker_workers_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const workerId = String(pendingAction?.payload?.workerId || "").trim();
+      clearChatbotPendingAction();
+
+      if (actionType === "open_top_worker_profile") {
+        const topWorker = Array.isArray(topWorkers) && topWorkers.length > 0 ? topWorkers[0] : null;
+        if (topWorker) {
+          handleOpenWorkerJobProfile(topWorker);
+        } else {
+          navigateToTab("overview");
+        }
+        return;
+      }
+
+      if (actionType === "open_worker_profile") {
+        if (workerId) {
+          navigate(`/worker-profile?workerId=${encodeURIComponent(workerId)}`);
+        } else {
+          navigateToTab("workers");
+        }
+        return;
+      }
+
+      if (actionType === "copy_code") {
+        navigate("/workers?chatbotAction=copy");
+        return;
+      }
+
+      if (actionType === "open_share_modal") {
+        navigate("/workers?chatbotAction=share");
+        return;
+      }
+
+      navigateToTab("workers");
+    }
+  }, [
+    handleClearNotifications,
+    handleMarkAllNotificationsRead,
+    handleMarkNotificationRead,
+    handleOpenWorkerJobProfile,
+    handleRoleSwitch,
+    profileForm?.email,
+    navigate,
+    navigateToTab,
+    requestEmailVerification,
+    readNotificationIds,
+    setEmailVerification,
+    topWorkers,
+    verifyEmailChange,
+    visibleNotificationItems
+  ]);
 
   const resolveNotificationTab = (notification = {}) => {
     const preferredTab = String(notification.targetTab || "").trim();
@@ -238,7 +423,7 @@ const BrokerDashboard = ({
         />
       );
     }
-    return <BrokerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} />;
+    return <BrokerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} userEmail={userEmail} />;
   };
 
   return (

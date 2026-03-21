@@ -203,6 +203,112 @@ const WorkerDashboard = ({
     }
   };
 
+  useEffect(() => {
+    const pendingAction = readChatbotPendingAction();
+    if (!pendingAction || typeof pendingAction !== "object") return;
+
+    if (pendingAction.type === "worker_page_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const monthFilter = String(pendingAction?.payload?.monthFilter || "").trim();
+      const starsFilter = String(pendingAction?.payload?.starsFilter || "").trim();
+      clearChatbotPendingAction();
+
+      if (actionType === "open_earnings") {
+        const params = new URLSearchParams();
+        if (monthFilter) params.set("month", monthFilter);
+        navigate(`/earnings${params.toString() ? `?${params.toString()}` : ""}`);
+        return;
+      }
+
+      if (actionType === "open_reviews") {
+        const params = new URLSearchParams();
+        if (starsFilter) params.set("stars", starsFilter);
+        navigate(`/reviews${params.toString() ? `?${params.toString()}` : ""}`);
+        return;
+      }
+
+      return;
+    }
+
+    if (pendingAction.type === "profile_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["email", "phone", "bio"].includes(section) ? section : "email";
+      navigate(`/profile?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "settings_section_action") {
+      const section = String(pendingAction?.payload?.section || "").toLowerCase();
+      clearChatbotPendingAction();
+      const targetSection = ["notifications", "password", "delete-account"].includes(section)
+        ? section
+        : "notifications";
+      navigate(`/settings?section=${encodeURIComponent(targetSection)}`);
+      return;
+    }
+
+    if (pendingAction.type === "dashboard_notification_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "mark_all_read") {
+        handleMarkAllNotificationsRead();
+        return;
+      }
+      if (actionType === "clear_all") {
+        handleClearNotifications();
+        return;
+      }
+
+      if (actionType === "open_unread_target") {
+        const readSet = new Set(readNotificationIds.map((id) => toStableId(id)).filter(Boolean));
+        const firstUnread = visibleNotificationItems.find((item) => !readSet.has(toStableId(item?.id)));
+        if (firstUnread) {
+          const normalizedId = toStableId(firstUnread.id);
+          if (normalizedId) {
+            handleMarkNotificationRead(normalizedId);
+          }
+          setShowNotifications(false);
+          const preferredTab = String(firstUnread.targetTab || "").trim();
+          if (preferredTab && TAB_PATH_MAP[preferredTab]) {
+            navigateToTab(preferredTab);
+          }
+          return;
+        }
+      }
+
+      setShowUserMenu(false);
+      setIsMobileMenuOpen(false);
+      setShowNotifications(true);
+      return;
+    }
+
+    if (pendingAction.type === "role_switch_action") {
+      const actionType = String(pendingAction?.payload?.action || "").toLowerCase();
+      const targetRole = String(pendingAction?.payload?.role || "").toLowerCase();
+      clearChatbotPendingAction();
+
+      if (actionType === "switch_role" && ["customer", "broker"].includes(targetRole)) {
+        handleRoleSwitch(targetRole);
+        return;
+      }
+
+      setRoleSwitchStatus({ loading: false, error: "" });
+      setShowUserMenu(false);
+      setShowRoleSwitchModal(true);
+    }
+  }, [
+    handleClearNotifications,
+    handleMarkAllNotificationsRead,
+    handleMarkNotificationRead,
+    handleRoleSwitch,
+    navigate,
+    navigateToTab,
+    readNotificationIds,
+    visibleNotificationItems
+  ]);
+
   const resolveNotificationTab = (notification = {}) => {
     const preferredTab = String(notification.targetTab || "").trim();
     if (preferredTab && TAB_PATH_MAP[preferredTab]) return preferredTab;
@@ -250,7 +356,7 @@ const WorkerDashboard = ({
           onVerifyEmailChange={verifyEmailChange} />
       );
     }
-    return <WorkerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} />;
+    return <WorkerSettingsPage onLogout={onLogout} authToken={authToken} userName={userName} userEmail={userEmail} />;
   };
 
   return (

@@ -53,7 +53,7 @@ function WorkerOverviewPage({ stats, jobRequests, recentJobs, setActiveTab, hand
                         {job.date} at {job.time}
                       </p>
                     </div>
-                    <p className="text-sm font-bold text-gray-900">INR {job.amount.toLocaleString("en-IN")}</p>
+                    <p className="text-sm font-bold text-gray-900">INR {job.workerPayout !== undefined ? job.workerPayout : job.amount.toLocaleString("en-IN")}</p>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <button
@@ -90,7 +90,7 @@ function WorkerOverviewPage({ stats, jobRequests, recentJobs, setActiveTab, hand
                     <p className="text-sm text-gray-500">{job.service}</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <p className="text-sm font-medium text-gray-900">INR {job.amount.toLocaleString("en-IN")}</p>
+                    <p className="text-sm font-medium text-gray-900">INR {job.workerPayout !== undefined ? job.workerPayout : job.amount.toLocaleString("en-IN")}</p>
                     <div className="flex items-center justify-end text-sm text-gray-500">
                       <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />
                       <span>{job.rating}</span>

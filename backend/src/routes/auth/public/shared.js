@@ -152,6 +152,60 @@ async function createOrRestoreUserFromPendingSignup(pendingSignup) {
   return { user, restoredCredentials: false };
 }
 
+const TWO_FACTOR_OTP_LENGTH = 6;
+const TWO_FACTOR_OTP_EXPIRY_MINUTES = Math.max(1, Number(process.env.TWO_FACTOR_OTP_EXPIRY_MINUTES || 10));
+
+function generateTwoFactorOTP() {
+  let code = "";
+  for (let index = 0; index < TWO_FACTOR_OTP_LENGTH; index += 1) {
+    code += String(crypto.randomInt(0, 10));
+  }
+  return code;
+}
+
+function getTwoFactorExpiryDate() {
+  return new Date(Date.now() + TWO_FACTOR_OTP_EXPIRY_MINUTES * 60 * 1000);
+}
+
+function isTwoFactorOTPExpired(expiresAt) {
+  return !expiresAt || new Date(expiresAt).getTime() <= Date.now();
+}
+
+function buildTwoFactorOTPEmail(userName, otpCode) {
+  const subject = "Your Omni Two-Factor Authentication Code";
+  const safeName = String(userName || "User").trim() || "User";
+  const safeOtpCode = String(otpCode || "").trim();
+  const text = `Hello ${safeName},
+
+To complete your Omni login, use this one-time verification code:
+${safeOtpCode}
+
+This code expires in ${TWO_FACTOR_OTP_EXPIRY_MINUTES} minutes.
+
+If you did not attempt to log in, you can ignore this email.
+
+Omni Team`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+      <h2 style="color: #1e40af;">Two-Factor Authentication</h2>
+      <p>Hi ${safeName},</p>
+      <p>To complete your login, please enter the following code:</p>
+      <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+        <p style="font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #1e40af; margin: 0;">
+          ${safeOtpCode}
+        </p>
+      </div>
+      <p style="color: #666; font-size: 14px;">
+        This code will expire in ${TWO_FACTOR_OTP_EXPIRY_MINUTES} minutes.
+      </p>
+      <p style="color: #999; font-size: 12px;">
+        If you did not attempt to log in, you can safely ignore this email.
+      </p>
+    </div>
+  `;
+  return { subject, text, html };
+}
+
 export {
   PendingSignup,
   PendingPasswordReset,
@@ -185,5 +239,11 @@ export {
   buildSignupSuccessEmail,
   buildForgotPasswordCodeEmail,
   buildPasswordResetSuccessEmail,
-  createOrRestoreUserFromPendingSignup
+  createOrRestoreUserFromPendingSignup,
+  TWO_FACTOR_OTP_LENGTH,
+  TWO_FACTOR_OTP_EXPIRY_MINUTES,
+  generateTwoFactorOTP,
+  getTwoFactorExpiryDate,
+  isTwoFactorOTPExpired,
+  buildTwoFactorOTPEmail
 };

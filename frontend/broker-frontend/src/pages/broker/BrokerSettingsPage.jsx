@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import api from "../../api";
 import { toBooleanOrDefault, toShortErrorMessage } from "@shared/utils/common";
@@ -7,6 +7,8 @@ import NotificationSettingsSection from "@shared/settings/NotificationSettingsSe
 import AccountSettingsSection from "@shared/settings/AccountSettingsSection";
 
 const NOTIFICATION_STORAGE_KEY = "omni:settings:broker:notifications";
+const ROLE_SESSION_KEY = "omni_broker_session";
+const ALL_SESSION_KEYS = ["omni_customer_session", "omni_broker_session", "omni_worker_session"];
 const DEFAULT_NOTIFICATION_SETTINGS = {
   notificationsEnabled: true,
   jobRequests: true,
@@ -28,12 +30,22 @@ function normalizeSettings(value) {
     jobRequests: toBooleanOrDefault(input.jobRequests, DEFAULT_NOTIFICATION_SETTINGS.jobRequests),
     payments: toBooleanOrDefault(input.payments, DEFAULT_NOTIFICATION_SETTINGS.payments),
     jobAlerts: toBooleanOrDefault(input.jobAlerts, DEFAULT_NOTIFICATION_SETTINGS.jobAlerts),
-    reminders: toBooleanOrDefault(input.reminders, DEFAULT_NOTIFICATION_SETTINGS.reminders)
+    reminders: toBooleanOrDefault(input.reminders, DEFAULT_NOTIFICATION_SETTINGS.reminders),
+    pushEnabled: toBooleanOrDefault(input.pushEnabled, true),
+    emailEnabled: toBooleanOrDefault(input.emailEnabled, true),
+    smsEnabled: toBooleanOrDefault(input.smsEnabled, true),
+    quietHoursStart: input.quietHoursStart || "22:00",
+    quietHoursEnd: input.quietHoursEnd || "08:00",
+    criticalAlertOverride: toBooleanOrDefault(input.criticalAlertOverride, true),
+    weekendOnlyReminders: toBooleanOrDefault(input.weekendOnlyReminders, false)
   };
 }
 
-function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
+function BrokerSettingsPage({ onLogout, authToken, userName = "", userEmail = "" }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const notificationsSectionRef = useRef(null);
+  const accountSectionRef = useRef(null);
   const handleBackClick = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -52,14 +64,37 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
   const [deleteStatus, setDeleteStatus] = useState({ loading: false, error: "", success: "" });
 
   useEffect(() => {
-    try {
-      const rawSettings = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-      const parsedSettings = rawSettings ? JSON.parse(rawSettings) : null;
-      setSettings(normalizeSettings(parsedSettings));
-    } catch (_error) {
-      setSettings(DEFAULT_NOTIFICATION_SETTINGS);
-    }
-  }, []);
+    let active = true;
+    const fetchSettings = async () => {
+      try {
+        if (authToken) {
+          const { data } = await api.get("/auth/session", {
+            headers: { Authorization: `Bearer ${authToken}` }
+          });
+          if (active && data?.user?.notificationSettings) {
+             setSettings(normalizeSettings(data.user.notificationSettings));
+             localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(data.user.notificationSettings));
+             return;
+          }
+        }
+      } catch (e) {
+        // Fallback to local storage
+      }
+      
+      if (active) {
+        try {
+          const rawSettings = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+          const parsedSettings = rawSettings ? JSON.parse(rawSettings) : null;
+          setSettings(normalizeSettings(parsedSettings));
+        } catch (_error) {
+          setSettings(normalizeSettings({}));
+        }
+      }
+    };
+    
+    fetchSettings();
+    return () => { active = false; };
+  }, [authToken]);
 
   const toggleSetting = (key) => {
     setSettings((prev) => ({
@@ -80,6 +115,38 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
   };
 
   useEffect(() => {
+    const section = String(new URLSearchParams(location.search).get("section") || "").toLowerCase();
+    if (!section) return;
+
+    if (section === "notifications") {
+      toggleNotificationsForm(true);
+      window.setTimeout(() => {
+        notificationsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+      return;
+    }
+
+    if (section === "password") {
+      setShowNotificationsForm(false);
+      setShowDeleteForm(false);
+      setShowPasswordForm(true);
+      window.setTimeout(() => {
+        accountSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+      return;
+    }
+
+    if (section === "delete-account") {
+      setShowNotificationsForm(false);
+      setShowPasswordForm(false);
+      setShowDeleteForm(true);
+      window.setTimeout(() => {
+        accountSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     setDeleteForm((prev) => ({ ...prev, username: userName || prev.username || "" }));
   }, [userName]);
 
@@ -89,14 +156,15 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
     }
   };
 
-  const handleSaveNotificationSettings = async () => {
+  const handleSaveNotificationSettings = async (enhancedSettings = null) => {
+    const finalSettings = enhancedSettings || settings;
     setNotificationStatus({ loading: true, error: "", success: "" });
     try {
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(settings));
+      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(finalSettings));
       if (authToken) {
         await api.put(
           "/profile/notifications",
-          settings,
+          finalSettings,
           {
             headers: { Authorization: `Bearer ${authToken}` }
           }
@@ -203,7 +271,7 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
           </button>
         </div>
         <div className="space-y-6">
-          <div className="border rounded-lg p-6 bg-white/60">
+          <div ref={notificationsSectionRef} className="border rounded-lg p-6 bg-white/60">
             <h4 className="font-semibold text-gray-900 mb-4">Notifications</h4>
             <NotificationSettingsSection
               theme={BROKER_THEME}
@@ -215,14 +283,15 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
               setStatus={setNotificationStatus}
               onSave={handleSaveNotificationSettings}
               labels={{
-                jobRequests: "Get notified for new and updated booking requests.",
-                payments: "Get alerts when commission and payment updates happen.",
-                jobAlerts: "Receive alerts for active and completed jobs.",
-                reminders: "Receive reminders for pending broker actions."
+                jobRequests: { title: "Network Updates", description: "Get notified when new workers join or leave your network." },
+                payments: { title: "Commission Updates", description: "Get alerts when broker commissions are processed." },
+                jobAlerts: { title: "Worker Activity", description: "Receive alerts for major jobs completed by your workers." },
+                reminders: { title: "System Reminders", description: "Receive reminders for pending approvals and account actions." }
               }}
             />
           </div>
 
+          <div ref={accountSectionRef}>
           <AccountSettingsSection
             theme={BROKER_THEME}
             onLogout={handleLogoutClick}
@@ -240,7 +309,16 @@ function BrokerSettingsPage({ onLogout, authToken, userName = "" }) {
             deleteStatus={deleteStatus}
             setDeleteStatus={setDeleteStatus}
             onDeleteAccount={handleDeleteAccount}
+            userEmail={userEmail}
+            sessionConfig={{
+              currentRole: "broker",
+              currentSessionKey: ROLE_SESSION_KEY,
+              sessionKeys: ALL_SESSION_KEYS
+            }}
+            api={api}
+            authToken={authToken}
           />
+          </div>
         </div>
       </div>
     </div>

@@ -24,6 +24,27 @@ async function sendMail({ to, subject, text, html }) {
   }
 
   const from = getSenderEmail();
+  const normalizedText = String(text || "").trim();
+  const normalizedHtml = String(html || "").trim();
+
+  if (!normalizedText && !normalizedHtml) {
+    const error = new Error("Email content is required. Provide text or html.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const payload = {
+    sender: { email: from },
+    to: [{ email: recipient }],
+    subject: String(subject || "").trim() || "Omni Notification"
+  };
+
+  if (normalizedHtml) {
+    payload.htmlContent = normalizedHtml;
+  }
+  if (normalizedText) {
+    payload.textContent = normalizedText;
+  }
 
   let response;
   try {
@@ -34,13 +55,7 @@ async function sendMail({ to, subject, text, html }) {
         "api-key": apiKey,
         "content-type": "application/json"
       },
-      body: JSON.stringify({
-        sender: { email: from },
-        to: [{ email: recipient }],
-        subject: String(subject || "").trim() || "Omni Notification",
-        htmlContent: String(html || "").trim() || undefined,
-        textContent: String(text || "").trim()
-      })
+      body: JSON.stringify(payload)
     });
   } catch (fetchError) {
     logger.error("Email send failed", {

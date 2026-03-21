@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Copy, Share2, X } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, Check, Copy, Share2, X, Search, Filter } from "lucide-react";
 import api from "../../api";
 import { useAutoDismissValue } from "@shared/hooks/useAutoDismissNotice";
 
@@ -11,6 +11,7 @@ function toAvatarUrl(name) {
 
 function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWorkerProfile }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const handleBackClick = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -24,6 +25,13 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWor
   const [workers, setWorkers] = useState([]);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState("idle");
+
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // 'all', 'active', 'inactive'
+  const [commissionRange, setCommissionRange] = useState("all"); // 'all', '0-500', '500-2000', '2000+'
+  const [sortByJoin, setSortByJoin] = useState("newest"); // 'newest', 'oldest'
+
   useAutoDismissValue(error, () => setError(""));
 
   const totalWorkers = workers.length || Number(stats.totalWorkers || 0);
@@ -86,6 +94,65 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWor
       window.setTimeout(() => setCopyStatus("idle"), 2200);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const chatbotAction = String(params.get("chatbotAction") || "").trim().toLowerCase();
+    if (!chatbotAction) return;
+
+    if (chatbotAction === "share") {
+      handleShareModalOpen();
+      navigate("/workers", { replace: true });
+      return;
+    }
+
+    if (chatbotAction === "copy") {
+      if (!brokerCode) return;
+      handleShareModalOpen();
+      void handleCopyCode();
+      navigate("/workers", { replace: true });
+    }
+  }, [brokerCode, location.search, navigate]);
+
+  const filteredWorkers = useMemo(() => {
+    let result = [...workers];
+    
+    // Quick search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(w => 
+        (w.name || "").toLowerCase().includes(q) || 
+        (w.email || "").toLowerCase().includes(q) ||
+        (w.phone || "").toLowerCase().includes(q) ||
+        (Array.isArray(w.servicesProvided) && w.servicesProvided.join(" ").toLowerCase().includes(q))
+      );
+    }
+    
+    // Status filter
+    if (statusFilter === "active") result = result.filter(w => w.isAvailable);
+    if (statusFilter === "inactive") result = result.filter(w => !w.isAvailable);
+    
+    // Commission range filter
+    if (commissionRange !== "all") {
+      result = result.filter(w => {
+        const comm = Number(w.totalBrokerCommission || 0);
+        if (commissionRange === "0-500") return comm >= 0 && comm <= 500;
+        if (commissionRange === "500-2000") return comm > 500 && comm <= 2000;
+        if (commissionRange === "2000+") return comm > 2000;
+        return true;
+      });
+    }
+
+    // Join date sort (fallback to ID if date not present)
+    result.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a._id || null).getTime();
+      const dateB = new Date(b.createdAt || b._id || null).getTime();
+      if (sortByJoin === "newest") return dateB - dateA;
+      return dateA - dateB;
+    });
+
+    return result;
+  }, [workers, searchQuery, statusFilter, commissionRange, sortByJoin]);
 
   if (!authToken) {
     return (
@@ -154,10 +221,70 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWor
       )}
 
       {!loading && workers.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {workers.map((worker) => (
-            <div key={worker.id} className="bg-white/80 shadow-sm rounded-xl border p-5">
-              <div className="flex items-start gap-4">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search worker by name, email, phone or service..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-sm border-gray-300 rounded-md focus:ring-emerald-500 bg-white min-w-[120px]"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select
+                value={commissionRange}
+                onChange={(e) => setCommissionRange(e.target.value)}
+                className="text-sm border-gray-300 rounded-md focus:ring-emerald-500 bg-white min-w-[140px]"
+              >
+                <option value="all">Any Commission</option>
+                <option value="0-500">₹0 - ₹500</option>
+                <option value="500-2000">₹500 - ₹2,000</option>
+                <option value="2000+">₹2,000+</option>
+              </select>
+              <select
+                value={sortByJoin}
+                onChange={(e) => setSortByJoin(e.target.value)}
+                className="text-sm border-gray-300 rounded-md focus:ring-emerald-500 bg-white min-w-[130px]"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+            </div>
+          </div>
+          
+          {filteredWorkers.length === 0 ? (
+            <div className="bg-white shadow-sm border rounded-xl py-10 px-4 text-center text-gray-500 text-sm">
+              <p>No workers match the current filters.</p>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setCommissionRange("all");
+                  setSortByJoin("newest");
+                }}
+                className="mt-2 text-emerald-600 hover:text-emerald-800 font-medium text-xs"
+              >
+                Clear all filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {filteredWorkers.map((worker) => (
+                <div key={worker.id} className="bg-white/80 shadow-sm rounded-xl border p-5">
+                  <div className="flex items-start gap-4">
                 <img
                   src={worker.photoUrl || toAvatarUrl(worker.name)}
                   alt={worker.name}
@@ -220,11 +347,13 @@ function BrokerWorkersPage({ authToken, refreshSignal = 0, stats = {}, onViewWor
             </div>
           ))}
         </div>
+        )}
+        </div>
       )}
 
       {shareModalOpen && (
-        <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm" onClick={() => setShareModalOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h4 className="text-lg font-bold text-slate-900">Share Broker Code</h4>

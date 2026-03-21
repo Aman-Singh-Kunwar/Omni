@@ -2,7 +2,12 @@ import express from "express";
 import Booking from "../../models/Booking.js";
 import User from "../../models/User.js";
 import { resolvePhotoUrlFromUser } from "../../schemas/profile.js";
-import { isLikelyObjectId, readAuthUserFromRequest, safeNormalizeBrokerCode } from "../helpers.js";
+import {
+  calculateBrokerCommissionAmount,
+  isLikelyObjectId,
+  readAuthUserFromRequest,
+  safeNormalizeBrokerCode
+} from "../helpers.js";
 
 const router = express.Router();
 
@@ -98,7 +103,7 @@ router.get("/worker/public-profile", async (req, res, next) => {
           if (!belongsToViewerBroker) {
             return sum;
           }
-          return sum + Number(booking?.brokerCommissionAmount || 0);
+          return sum + calculateBrokerCommissionAmount(booking);
         }, 0)
       : 0;
 

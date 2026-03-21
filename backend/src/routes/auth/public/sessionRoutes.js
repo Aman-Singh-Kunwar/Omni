@@ -11,7 +11,12 @@ import {
   normalizeRole,
   signToken,
   toAuthUser,
-  verifyToken
+  verifyToken,
+  sendMail,
+  generateTwoFactorOTP,
+  getTwoFactorExpiryDate,
+  isTwoFactorOTPExpired,
+  buildTwoFactorOTPEmail
 } from "./shared.js";
 
 const router = express.Router();
@@ -80,6 +85,38 @@ router.post("/auth/login", async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials." });
     }
 
+    // Check if 2FA is enabled
+    if (user.twoFactorAuth?.twoFactorAuthEnabled) {
+      const otpCode = generateTwoFactorOTP();
+      const otpExpiresAt = getTwoFactorExpiryDate();
+
+      user.twoFactorAuth.otpCode = otpCode;
+      user.twoFactorAuth.otpExpiresAt = otpExpiresAt;
+      await user.save();
+
+      const { subject, text, html } = buildTwoFactorOTPEmail(user.name, otpCode);
+      try {
+        await sendMail({ to: user.email, subject, text, html });
+      } catch (mailError) {
+        logger.error("Failed to send 2FA OTP email", {
+          userId: String(user._id),
+          email: user.email,
+          error: mailError?.message
+        });
+      }
+
+      logger.info("2FA OTP sent", {
+        userId: String(user._id),
+        email: user.email,
+        role: user.role
+      });
+
+      return res.json({
+        requiresTwoFactor: true,
+        message: "Verification code sent to your email. Please enter the OTP to complete login."
+      });
+    }
+
     user.lastLoginAt = new Date();
     await ensureBrokerCodeForUser(user);
     await user.save();
@@ -127,6 +164,89 @@ router.get("/auth/me", async (req, res, next) => {
     await ensureBrokerCodeForUser(user);
     return res.json({ user: toAuthUser(user) });
   } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/auth/verify-2fa", async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const role = normalizeRole(req.body?.role);
+    const otpCode = String(req.body?.otpCode || "").replace(/\s+/g, "").trim();
+
+    if (!email || !role || !otpCode) {
+      logger.warn("2FA verification failed", {
+        reason: "missing_fields",
+        email,
+        role
+      });
+      return res.status(400).json({ message: "Email, role, and OTP code are required." });
+    }
+
+    const user = await User.findOne({ email, role });
+    if (!user) {
+      logger.warn("2FA verification failed", {
+        reason: "user_not_found",
+        email,
+        role
+      });
+      return res.status(401).json({ message: "Invalid credentials." });
+    }
+
+    if (!user.twoFactorAuth?.twoFactorAuthEnabled) {
+      logger.warn("2FA verification failed", {
+        reason: "2fa_not_enabled",
+        email,
+        role,
+        userId: String(user._id)
+      });
+      return res.status(400).json({ message: "Two-factor authentication is not enabled." });
+    }
+
+    if (isTwoFactorOTPExpired(user.twoFactorAuth.otpExpiresAt)) {
+      logger.warn("2FA verification failed", {
+        reason: "otp_expired",
+        email,
+        role,
+        userId: String(user._id)
+      });
+      return res.status(401).json({ message: "OTP has expired. Please log in again." });
+    }
+
+    if (user.twoFactorAuth.otpCode !== otpCode) {
+      logger.warn("2FA verification failed", {
+        reason: "invalid_otp",
+        email,
+        role,
+        userId: String(user._id)
+      });
+      return res.status(401).json({ message: "Invalid OTP code." });
+    }
+
+    // Clear the OTP after successful verification
+    user.twoFactorAuth.otpCode = null;
+    user.twoFactorAuth.otpExpiresAt = null;
+    user.lastLoginAt = new Date();
+    await ensureBrokerCodeForUser(user);
+    await user.save();
+
+    const token = signToken(user);
+    logger.info("2FA verification successful", {
+      userId: String(user._id),
+      email,
+      role: user.role
+    });
+
+    return res.json({
+      user: toAuthUser(user),
+      token
+    });
+  } catch (error) {
+    logger.error("2FA verification failed with exception", {
+      email: normalizeEmail(req.body?.email),
+      role: normalizeRole(req.body?.role),
+      message: error?.message || "Unknown 2FA verification error"
+    });
     return next(error);
   }
 });

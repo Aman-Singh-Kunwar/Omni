@@ -18,9 +18,15 @@ function CustomerAuthPage({ mode = "login", onSuccess }) {
     email: "",
     password: "",
     confirmPassword: "",
-    verificationCode: ""
+    verificationCode: "",
+    twoFactorOTP: ""
   });
   const [verification, setVerification] = useState({
+    pending: false,
+    email: "",
+    role
+  });
+  const [twoFactorAuth, setTwoFactorAuth] = useState({
     pending: false,
     email: "",
     role
@@ -109,6 +115,30 @@ function CustomerAuthPage({ mode = "login", onSuccess }) {
       await submitSignupRequest();
     } catch (error) {
       setStatus({ loading: false, error: error.response?.data?.message || "Unable to resend verification code.", info: "" });
+    }
+  };
+
+  const submit2FA = async () => {
+    const otpCode = String(form.twoFactorOTP || "")
+      .replace(/\s+/g, "")
+      .trim();
+    if (!otpCode) {
+      setStatus({ loading: false, error: "Please enter the OTP code.", info: "" });
+      return;
+    }
+
+    setStatus({ loading: true, error: "", info: "" });
+    try {
+      const response = await api.post("/auth/verify-2fa", {
+        email: twoFactorAuth.email,
+        role: twoFactorAuth.role,
+        otpCode
+      });
+
+      onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
+      navigate(redirectPath, { replace: true });
+    } catch (error) {
+      setStatus({ loading: false, error: error.response?.data?.message || "2FA verification failed.", info: "" });
     }
   };
 
@@ -227,7 +257,27 @@ function CustomerAuthPage({ mode = "login", onSuccess }) {
         return;
       }
 
+      if (twoFactorAuth.pending) {
+        await submit2FA();
+        return;
+      }
+
       const response = await api.post("/auth/login", { email: form.email, password: form.password, role });
+      
+      if (response.data?.requiresTwoFactor) {
+        setTwoFactorAuth({
+          pending: true,
+          email: form.email,
+          role
+        });
+        setStatus({
+          loading: false,
+          error: "",
+          info: response.data?.message || "Verification code sent to your email. Please enter the OTP to complete login."
+        });
+        return;
+      }
+
       onSuccess({ user: response.data.user, token: response.data.token || "", rememberMe });
       navigate(redirectPath, { replace: true });
     } catch (error) {
@@ -367,6 +417,43 @@ function CustomerAuthPage({ mode = "login", onSuccess }) {
               </div>
             </>
           )}
+          {mode === "login" && twoFactorAuth.pending && (
+            <>
+              <p className="rounded bg-purple-50 px-3 py-2 text-sm text-purple-700">
+                Verification code sent to <strong>{twoFactorAuth.email}</strong>. Enter the 6-digit code to complete login.
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Authentication Code</span>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border px-3 py-2 tracking-[0.3em]"
+                  value={form.twoFactorOTP}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      twoFactorOTP: event.target.value.replace(/[^0-9]/g, "").slice(0, 6)
+                    }))
+                  }
+                  maxLength={6}
+                  placeholder="123456"
+                />
+              </label>
+              <p className="text-xs text-slate-600 mt-2">
+                This code will expire in 10 minutes.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setTwoFactorAuth({ pending: false, email: "", role });
+                  setForm((prev) => ({ ...prev, password: "", twoFactorOTP: "" }));
+                  setStatus({ loading: false, error: "", info: "" });
+                }}
+                className="mt-3 font-medium text-slate-500 hover:text-slate-700 text-sm"
+              >
+                Use different credentials
+              </button>
+            </>
+          )}
         </div>
 
         <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
@@ -387,7 +474,7 @@ function CustomerAuthPage({ mode = "login", onSuccess }) {
           disabled={status.loading}
           className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-70"
         >
-          {status.loading ? "Please wait..." : mode === "login" ? "Login" : verification.pending ? "Verify & Sign Up" : "Sign Up"}
+          {status.loading ? "Please wait..." : mode === "login" ? (twoFactorAuth.pending ? "Verify & Login" : "Login") : verification.pending ? "Verify & Sign Up" : "Sign Up"}
         </button>
 
         <p className="mt-4 text-center text-sm text-slate-500">

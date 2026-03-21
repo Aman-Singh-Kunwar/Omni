@@ -88,8 +88,151 @@ function CustomerBookingFormPage({
     : [];
   const [timeParts, setTimeParts] = useState(() => parseTimeParts(bookingForm.time));
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [recentLocations, setRecentLocations] = useState([]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [autocompleteCache, setAutocompleteCache] = useState({});
+  const [autocompleteResults, setAutocompleteResults] = useState([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
   const hourOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1)), []);
   const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, i) => String(i)), []);
+  
+  // Load recent locations on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('recentBookingLocations');
+    if (stored) {
+      try {
+        setRecentLocations(JSON.parse(stored).slice(0, 5));
+      } catch { }
+    }
+    // Load autocomplete cache
+    const cachedAutocomplete = localStorage.getItem('locationAutocompleteCache');
+    if (cachedAutocomplete) {
+      try {
+        setAutocompleteCache(JSON.parse(cachedAutocomplete));
+      } catch { }
+    }
+  }, []);
+  
+  // Save location to recent when selected
+  const saveLocToRecent = (location) => {
+    if (!location) return;
+    const stored = JSON.parse(localStorage.getItem('recentBookingLocations') || '[]');
+    const filtered = stored.filter(l => l !== location);
+    const updated = [location, ...filtered].slice(0, 5);
+    localStorage.setItem('recentBookingLocations', JSON.stringify(updated));
+    setRecentLocations(updated);
+  };
+  
+  // Get time options for today (disable past times)
+  const getAvailableHours = () => {
+    const isToday = bookingForm.date === new Date().toISOString().split('T')[0];
+    if (!isToday) return hourOptions;
+    const currentHour = new Date().getHours() % 12 || 12;
+    return hourOptions.filter(h => Number(h) >= currentHour);
+  };
+  
+  // Clear all form
+  const handleClearForm = () => {
+    setBookingForm({
+      date: '', time: '', location: '', locationLat: '', locationLng: '', 
+      service: '', description: '', applyDiscount: true
+    });
+    setTimeParts({ meridiem: "", hour: "", minute: "" });
+    setFormErrors({});
+    setShowClearConfirm(false);
+  };
+  
+  // Quick time chip options
+  const getQuickTimeChips = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeekend = new Date(now);
+    while (nextWeekend.getDay() !== 6 && nextWeekend.getDay() !== 0) {
+      nextWeekend.setDate(nextWeekend.getDate() + 1);
+    }
+    return [
+      { label: "Now +1h", date: now.toISOString().split("T")[0], time: `${(now.getHours() % 12 || 12)}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}` },
+      { label: "Tomorrow 9am", date: tomorrow.toISOString().split("T")[0], time: "9:00 AM" },
+      { label: "This Weekend", date: nextWeekend.toISOString().split("T")[0], time: "10:00 AM" }
+    ];
+  };
+  
+  // Validation logic
+  const validateForm = () => {
+    const errors = {};
+    if (!bookingForm.date) errors.date = "Date is required";
+    if (!bookingForm.time) errors.time = "Time is required";
+    if (!bookingForm.location || !bookingForm.locationLat) errors.location = "Location is required";
+    if (bookingSource === "worker" && !bookingForm.service) errors.service = "Service selection is required";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
+  // Debounced autocomplete search with caching
+  useEffect(() => {
+    if (!bookingForm.location || bookingForm.location.length < 2) {
+      setAutocompleteResults([]);
+      setShowAutocomplete(false);
+      return;
+    }
+    
+    const query = bookingForm.location.toLowerCase();
+    // Check cache first
+    if (autocompleteCache[query]) {
+      setAutocompleteResults(autocompleteCache[query]);
+      setShowAutocomplete(true);
+      return;
+    }
+    
+    // Simulate API call with debounce
+    const timer = setTimeout(async () => {
+      setAutocompleteLoading(true);
+      try {
+        // Mock autocomplete results (in real app, call geocoding API)
+        const results = [
+          bookingForm.location + ", New Delhi",
+          bookingForm.location + ", Mumbai",
+          bookingForm.location + ", Bangalore",
+        ].filter(r => r.toLowerCase().includes(query));
+        
+        // Update cache
+        const newCache = { ...autocompleteCache, [query]: results };
+        setAutocompleteCache(newCache);
+        localStorage.setItem('locationAutocompleteCache', JSON.stringify(newCache));
+        
+        setAutocompleteResults(results);
+        setShowAutocomplete(true);
+      } finally {
+        setAutocompleteLoading(false);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [bookingForm.location, autocompleteCache]);
+  
+  // Draft persistence
+  useEffect(() => {
+    const draftKey = `booking_draft_${bookingSource}_${selectedService?.id || selectedWorkerDetails?.id}`;
+    localStorage.setItem(draftKey, JSON.stringify(bookingForm));
+    setDraftSaved(true);
+    const timer = setTimeout(() => setDraftSaved(false), 2000);
+    return () => clearTimeout(timer);
+  }, [bookingForm, bookingSource, selectedService?.id, selectedWorkerDetails?.id]);
+  
+  // Keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        handleBookService?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [handleBookService]);
   const locationPickerInitialPosition = useMemo(() => {
     const rawLat = bookingForm.locationLat;
     const rawLng = bookingForm.locationLng;
@@ -247,11 +390,13 @@ function CustomerBookingFormPage({
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Choose Service</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Choose Service <span className="text-red-500">*</span>
+              </label>
               <select
                 value={bookingForm.service || ""}
                 onChange={(event) => onServiceChange(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                className={`w-full rounded-lg border px-3 py-2 ${formErrors.service ? "border-red-400 bg-red-50" : "border-gray-300"}`}
               >
                 <option value="">Choose service</option>
                 {selectedWorkerServices.map((service) => (
@@ -260,29 +405,57 @@ function CustomerBookingFormPage({
                   </option>
                 ))}
               </select>
+              {formErrors.service && <p className="mt-1 text-xs text-red-600">● {formErrors.service}</p>}
               {!selectedWorkerServices.length && <p className="mt-1 text-xs text-red-600">This worker has no listed services right now.</p>}
             </div>
           </>
         )}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Preferred Date</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Preferred Date <span className="text-red-500">*</span>
+          </label>
           <input
             type="date"
             value={bookingForm.date}
-            onChange={(event) => setBookingForm((prev) => ({ ...prev, date: event.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            onChange={(event) => {
+              setFormErrors(prev => ({ ...prev, date: "" }));
+              setBookingForm((prev) => ({ ...prev, date: event.target.value }));
+            }}
+            className={`w-full rounded-lg border px-3 py-2 ${formErrors.date ? "border-red-400 bg-red-50" : "border-gray-300"}`}
             min={new Date().toISOString().split("T")[0]}
           />
+          {formErrors.date && <p className="mt-1 text-xs text-red-600">● {formErrors.date}</p>}
+          <p className="mt-1 text-xs text-gray-500">Past dates are unavailable</p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Preferred Time</label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Preferred Time <span className="text-red-500">*</span>
+          </label>
+          <div className="mb-3 flex flex-wrap gap-2">
+            {getQuickTimeChips().map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => {
+                  setBookingForm(prev => ({ ...prev, date: chip.date, time: chip.time }));
+                  setFormErrors(prev => ({ ...prev, date: "", time: "" }));
+                }}
+                className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <select
               value={timeParts.hour}
-              onChange={(event) => updateTimePart({ hour: event.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              onChange={(event) => {
+                setFormErrors(prev => ({ ...prev, time: "" }));
+                updateTimePart({ hour: event.target.value });
+              }}
+              className={`w-full rounded-lg border px-3 py-2 ${formErrors.time ? "border-red-400 bg-red-50" : "border-gray-300"}`}
             >
               <option value="">Hour</option>
               {hourOptions.map((hour) => (
@@ -293,8 +466,11 @@ function CustomerBookingFormPage({
             </select>
             <select
               value={timeParts.minute}
-              onChange={(event) => updateTimePart({ minute: event.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              onChange={(event) => {
+                setFormErrors(prev => ({ ...prev, time: "" }));
+                updateTimePart({ minute: event.target.value });
+              }}
+              className={`w-full rounded-lg border px-3 py-2 ${formErrors.time ? "border-red-400 bg-red-50" : "border-gray-300"}`}
             >
               <option value="">Minute</option>
               {minuteOptions.map((minute) => (
@@ -305,43 +481,97 @@ function CustomerBookingFormPage({
             </select>
             <select
               value={timeParts.meridiem}
-              onChange={(event) => updateTimePart({ meridiem: event.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              onChange={(event) => {
+                setFormErrors(prev => ({ ...prev, time: "" }));
+                updateTimePart({ meridiem: event.target.value });
+              }}
+              className={`w-full rounded-lg border px-3 py-2 ${formErrors.time ? "border-red-400 bg-red-50" : "border-gray-300"}`}
             >
               <option value="">AM/PM</option>
               <option value="AM">AM</option>
               <option value="PM">PM</option>
             </select>
           </div>
+          {formErrors.time && <p className="mt-1 text-xs text-red-600">● {formErrors.time}</p>}
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Location</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="text"
-              value={bookingForm.location}
-              onChange={(event) =>
-                setBookingForm((prev) => ({
-                  ...prev,
-                  location: event.target.value,
-                  locationLat: "",
-                  locationLng: ""
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
-              placeholder="Enter location or select from map"
-            />
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Location <span className="text-red-500">*</span>
+          </label>
+          {recentLocations.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {recentLocations.map((loc, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setBookingForm(prev => ({ ...prev, location: loc }));
+                    saveLocToRecent(loc);
+                    setShowAutocomplete(false);
+                  }}
+                  className="rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs hover:bg-gray-100"
+                >
+                  {loc.substring(0, 20)}…
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="relative flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={bookingForm.location}
+                onChange={(event) => {
+                  setBookingForm((prev) => ({
+                    ...prev,
+                    location: event.target.value,
+                    locationLat: "",
+                    locationLng: ""
+                  }));
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setShowAutocomplete(false);
+                    if (bookingForm.location) saveLocToRecent(bookingForm.location);
+                  }, 200);
+                }}
+                onFocus={() => bookingForm.location.length >= 2 && setShowAutocomplete(true)}
+                className={`w-full rounded-lg border px-3 py-2 ${formErrors.location ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                placeholder="Enter location or select from map"
+              />
+              {showAutocomplete && autocompleteResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg z-10">
+                  {autocompleteLoading && (
+                    <div className="px-3 py-2 text-xs text-gray-500">Searching...</div>
+                  )}
+                  {autocompleteResults.map((result, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setBookingForm(prev => ({ ...prev, location: result }));
+                        setShowAutocomplete(false);
+                        saveLocToRecent(result);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    >
+                      {result}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setLocationPickerOpen(true)}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
             >
               <MapPin className="h-4 w-4" />
-              Select on Map
+              Map
             </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">Tap location to open map picker with pin and current location.</p>
+          {formErrors.location && <p className="mt-1 text-xs text-red-600">● {formErrors.location}</p>}
         </div>
 
         <div>
@@ -366,15 +596,52 @@ function CustomerBookingFormPage({
         >
           Cancel
         </button>
+        {showClearConfirm ? (
+          <div className="flex-1 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(false)}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 text-sm"
+            >
+              Keep Form
+            </button>
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="flex-1 rounded-lg bg-red-100 px-4 py-2.5 font-medium text-red-700 hover:bg-red-200 text-sm"
+            >
+              Clear All
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)}
+            className="rounded-lg border border-gray-300 px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Clear Form
+          </button>
+        )}
         <button
           type="button"
-          onClick={handleBookService}
+          onClick={() => {
+            if (validateForm()) {
+              handleBookService?.();
+            }
+          }}
           disabled={bookingStatus.loading || !canSubmitBooking}
-          className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
         >
+          {bookingStatus.loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
           {bookingStatus.loading ? "Booking..." : bookingSource === "worker" ? "Book Worker" : "Book Service"}
         </button>
       </div>
+      
+      {draftSaved && (
+        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+          ✓ Booking draft auto-saved
+        </div>
+      )}
 
       <LocationPickerModal
         open={locationPickerOpen}

@@ -73,7 +73,9 @@ export default function useWorkerDashboardData({ authToken, userName, needsDashb
                         amount: Number(job.workerPayout || job.amount || 0),
                         rating: Number(job.rating || 0),
                         feedback: String(job.feedback || ""),
-                        status: job.status || "completed"
+                        status: job.status || "completed",
+                        date: job.date,
+                        createdAt: job.createdAt
                     }))
                     : []
             );

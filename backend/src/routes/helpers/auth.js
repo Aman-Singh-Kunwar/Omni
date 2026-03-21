@@ -15,7 +15,8 @@ function toAuthUser(user) {
     emailVerified: user.emailVerified !== false,
     role: user.role,
     lastLoginAt: user.lastLoginAt,
-    profile
+    profile,
+    notificationSettings: user.notificationSettings || {}
   };
 }
 

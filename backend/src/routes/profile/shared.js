@@ -15,15 +15,26 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   jobRequests: true,
   payments: true,
   jobAlerts: true,
-  reminders: false
+  reminders: false,
+  pushEnabled: true,
+  emailEnabled: true,
+  smsEnabled: true,
+  quietHoursStart: "22:00",
+  quietHoursEnd: "08:00",
+  criticalAlertOverride: true,
+  weekendOnlyReminders: false
 };
 
 function normalizeNotificationSettings(payload = {}) {
   const next = {};
   for (const key of Object.keys(DEFAULT_NOTIFICATION_SETTINGS)) {
     if (Object.prototype.hasOwnProperty.call(payload, key)) {
-      if (typeof payload[key] !== "boolean") {
-        const error = new Error(`Invalid notification setting: ${key}`);
+      const defaultValue = DEFAULT_NOTIFICATION_SETTINGS[key];
+      const actualType = typeof payload[key];
+      const expectedType = typeof defaultValue;
+      
+      if (actualType !== expectedType) {
+        const error = new Error(`Invalid notification setting: ${key}. Expected ${expectedType}.`);
         error.statusCode = 400;
         throw error;
       }

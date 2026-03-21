@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Trash2, Upload, X } from "lucide-react";
+import { Camera, Trash2, Upload, X, RotateCw } from "lucide-react";
 
 const PREVIEW_SIZE = 220;
 const OUTPUT_SIZE = 360;
@@ -45,7 +45,7 @@ function loadImageMeta(src) {
   });
 }
 
-function ProfileImagePicker({ value = "", displayName = "", disabled = false, onChange }) {
+function ProfileImagePicker({ value = "", displayName = "", disabled = false, progress = undefined, progressColorTheme = "blue", onChange }) {
   const inputRef = useRef(null);
   const [status, setStatus] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -56,7 +56,8 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
     height: 0,
     zoom: 1,
     offsetX: 0,
-    offsetY: 0
+    offsetY: 0,
+    rotate: 0
   });
 
   const initials = useMemo(() => toInitials(displayName) || "U", [displayName]);
@@ -126,7 +127,8 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
         height: meta.height,
         zoom: 1,
         offsetX: 0,
-        offsetY: 0
+        offsetY: 0,
+        rotate: 0
       });
       setStatus("");
     } catch (_error) {
@@ -162,7 +164,11 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
       context.arc(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, 0, Math.PI * 2);
       context.closePath();
       context.clip();
-      context.drawImage(meta.image, outputLeft, outputTop, outputWidth, outputHeight);
+      const cx = outputLeft + outputWidth / 2;
+      const cy = outputTop + outputHeight / 2;
+      context.translate(cx, cy);
+      context.rotate((editorState.rotate || 0) * Math.PI / 180);
+      context.drawImage(meta.image, -outputWidth / 2, -outputHeight / 2, outputWidth, outputHeight);
       context.restore();
 
       let quality = 0.88;
@@ -194,8 +200,42 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
   return (
     <>
       <div className="flex flex-col items-center gap-2">
-        <div className="relative">
-          <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-slate-100 shadow-sm">
+        <div className="relative flex items-center justify-center" style={{ width: 128, height: 128 }}>
+          {progress !== undefined && (
+            <svg 
+              className="absolute inset-0 pointer-events-none z-0" 
+              viewBox="0 0 128 128"
+            >
+              <circle cx="64" cy="64" r="60" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+              <circle
+                cx="64"
+                cy="64"
+                r="60"
+                fill="none"
+                stroke={`url(#progressGradient-${progressColorTheme})`}
+                strokeWidth="4"
+                strokeDasharray={`${(progress / 100) * 376.991} 376.991`}
+                strokeLinecap="round"
+                transform="rotate(-270 64 64)"
+                className="transition-all duration-500 relative z-10"
+              />
+              <defs>
+                <linearGradient id={`progressGradient-blue`} x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#1e40af" />
+                </linearGradient>
+                <linearGradient id={`progressGradient-emerald`} x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="100%" stopColor="#047857" />
+                </linearGradient>
+                <linearGradient id={`progressGradient-orange`} x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f97316" />
+                  <stop offset="100%" stopColor="#ea580c" />
+                </linearGradient>
+              </defs>
+            </svg>
+          )}
+          <div className="h-[114px] w-[114px] overflow-hidden rounded-full border-[3px] border-white bg-slate-100 shadow-sm relative z-10">
             {hasImage ? (
               <img src={value} alt={displayName || "Profile"} className="h-full w-full object-cover" />
             ) : (
@@ -208,8 +248,12 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
             type="button"
             onClick={openPicker}
             disabled={disabled}
-            className="absolute -bottom-1 left-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-            style={{ transform: "translateX(-50%)" }}
+            className="absolute z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border-4 border-white bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 shadow-sm"
+            style={{ 
+              bottom: "-4px", 
+              left: "50%", 
+              transform: "translateX(-50%)" 
+            }}
             aria-label="Upload profile image"
           >
             <Camera className="h-4 w-4" />
@@ -304,7 +348,8 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
                           height: `${renderedHeight}px`,
                           left: `${renderedLeft}px`,
                           top: `${renderedTop}px`,
-                          maxWidth: "none"
+                          maxWidth: "none",
+                          transform: `rotate(${editorState.rotate || 0}deg)`
                         }}
                       />
                     )}
@@ -346,6 +391,15 @@ function ProfileImagePicker({ value = "", displayName = "", disabled = false, on
                         onChange={(event) => setEditorState((prev) => ({ ...prev, offsetY: Number(event.target.value) }))}
                         className="mt-1 w-full"
                       />
+                    </label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Rotate
+                      <div className="flex items-center gap-2">
+                        <input type="range" min="0" max="360" step="1" value={editorState.rotate || 0} onChange={(event) => setEditorState((prev) => ({ ...prev, rotate: Number(event.target.value) }))} className="mt-1 w-full" />
+                        <button type="button" onClick={() => setEditorState((prev) => ({ ...prev, rotate: ((prev.rotate || 0) + 90) % 360 }))} className="rounded p-1 text-slate-500 hover:bg-slate-100" aria-label="Rotate 90 degrees">
+                          <RotateCw className="h-4 w-4" />
+                        </button>
+                      </div>
                     </label>
                   </div>
 

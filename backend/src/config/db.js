@@ -11,10 +11,19 @@ async function connectMongo() {
   try {
     logger.infoOnce("mongo_connecting", "Connecting to MongoDB");
     await mongoose.connect(uri);
+    
+    // Run syncIndexes in background to avoid blocking startup
     if (process.env.SYNC_INDEXES !== "false") {
-      logger.infoOnce("mongo_sync_indexes", "Running mongoose syncIndexes");
-      await mongoose.syncIndexes();
+      logger.infoOnce("mongo_sync_indexes", "Running mongoose syncIndexes (non-blocking)");
+      mongoose.syncIndexes().catch((error) => {
+        logger.errorOnce(
+          `mongo_sync_indexes_failed:${error?.message || "unknown"}`,
+          "Failed to sync indexes",
+          { message: error?.message }
+        );
+      });
     }
+    
     logger.infoOnce("mongo_connected", "MongoDB connected");
   } catch (error) {
     logger.errorOnce(`mongo_connection_failed:${error?.message || "unknown"}`, "MongoDB connection failed", {

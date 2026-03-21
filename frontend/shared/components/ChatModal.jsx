@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Check, CheckCheck, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
+import { Check, CheckCheck, MessageCircle, Pencil, Send, Trash2, X, ArrowDown } from "lucide-react";
 import { createRealtimeSocket, resolveSocketBaseUrl } from "@shared/utils/realtime";
 
 const LOCKED_STATUSES = new Set(["completed", "cancelled", "not-provided"]);
@@ -14,6 +14,7 @@ function TickIcon({ status }) {
   if (status === "sending") return <Check className="w-3 h-3 text-white/50 shrink-0" />;
   if (status === "sent")    return <CheckCheck className="w-3 h-3 text-white/60 shrink-0" />;
   if (status === "read")    return <CheckCheck className="w-3 h-3 text-blue-300 shrink-0" />;
+  if (status === "failed")  return <X className="w-3 h-3 text-red-300 shrink-0" />;
   return null;
 }
 
@@ -22,7 +23,9 @@ function ChatModal({
   senderName, senderRole,
   counterpartName = "Other",
   authToken = "",
-  bookingStatus = ""
+  bookingStatus = "",
+  automationAction = null,
+  onAutomationHandled
 }) {
   const [messages,     setMessages]     = useState([]);
   const [inputText,    setInputText]    = useState("");
@@ -36,22 +39,57 @@ function ChatModal({
   const [mounted,      setMounted]      = useState(false);
   const [animating,    setAnimating]    = useState(false);
   const [otherOnline,  setOtherOnline]  = useState(false);
+  const [automationNotice, setAutomationNotice] = useState("");
+  const [otherIsTyping, setOtherIsTyping] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [showJumpButton, setShowJumpButton] = useState(false);
 
   const socketRef      = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const seenIds        = useRef(new Set());
   const pendingIds     = useRef(new Set());
   const otherIsReading = useRef(false);
   const historyLoaded  = useRef(false);
   const inputRef       = useRef(null);
   const longPressTimer = useRef(null);
+  const typingTimer    = useRef(null);
   const dblClickTimer  = useRef(null);
   const hasRespondedPresence = useRef(false);
+  const processedAutomationIdsRef = useRef(new Set());
 
   const isLocked = LOCKED_STATUSES.has(bookingStatus);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [autoScroll]);
+  
+  const handleMarkAllAsRead = useCallback(() => {
+    if (socketRef.current && bookingId) {
+      socketRef.current.emit("chat:read", { bookingId });
+      setMessages(prev => 
+        prev.map(m => m.senderRole !== senderRole ? { ...m, status: "read" } : m)
+      );
+    }
+  }, [bookingId, senderRole]);
+  
+  // Detect if user scrolled away from bottom
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowJumpButton(!isAtBottom);
+      if (isAtBottom) setAutoScroll(true);
+    };
+    
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
 
@@ -94,6 +132,7 @@ function ChatModal({
     setSelectedIds(new Set());
     setIsSelectMode(false);
     setEditingMsg(null);
+    setAutomationNotice("");
 
     const socket = createRealtimeSocket(authToken);
     if (!socket) return undefined;
@@ -162,6 +201,12 @@ function ChatModal({
         socket.emit("chat:presence", { bookingId, online: true });
       }
     };
+    
+    const onChatTyping = (data) => {
+      if (!data || data.bookingId !== bookingId) return;
+      if (data.senderRole === senderRole) return;
+      setOtherIsTyping(data.typing);
+    };
 
     socket.on("connect",        onConnect);
     socket.on("disconnect",     onDisconnect);
@@ -170,6 +215,7 @@ function ChatModal({
     socket.on("chat:deleted",   onChatDeleted);
     socket.on("chat:edited",    onChatEdited);
     socket.on("chat:presence",  onChatPresence);
+    socket.on("chat:typing",    onChatTyping);
     if (socket.connected) onConnect();
 
     return () => {
@@ -180,6 +226,7 @@ function ChatModal({
       socket.off("chat:deleted",   onChatDeleted);
       socket.off("chat:edited",    onChatEdited);
       socket.off("chat:presence",  onChatPresence);
+      socket.off("chat:typing",    onChatTyping);
       socket.emit("chat:presence", { bookingId, online: false });
       socket.disconnect();
       socketRef.current = null;
@@ -188,6 +235,30 @@ function ChatModal({
 
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  // Typing indicator
+  useEffect(() => {
+    if (!bookingId || !socketRef.current) return;
+    
+    // Clear existing timer
+    if (typingTimer.current) {
+      clearTimeout(typingTimer.current);
+    }
+    
+    // Emit typing event only if there's text
+    if (inputText.trim().length > 0) {
+      socketRef.current.emit("chat:typing", { bookingId, typing: true });
+    }
+    
+    // Set timer to emit typing: false after user stops typing for 2 seconds
+    typingTimer.current = setTimeout(() => {
+      socketRef.current?.emit("chat:typing", { bookingId, typing: false });
+    }, 2000);
+    
+    return () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    };
+  }, [inputText, bookingId]);
 
 
   useEffect(() => {
@@ -329,6 +400,104 @@ function ChatModal({
     exitSelectMode();
   }, [selectedIds, messages, exitSelectMode]);
 
+  useEffect(() => {
+    if (!open || !automationAction || !bookingId || loading) return;
+
+    const payload = automationAction && typeof automationAction === "object" ? automationAction : null;
+    if (!payload) return;
+
+    const actionId = String(payload.id || "").trim() || `${payload.action || "chat-action"}-${payload.bookingId || bookingId}`;
+    if (processedAutomationIdsRef.current.has(actionId)) return;
+
+    const targetBookingId = String(payload.bookingId || bookingId || "").trim();
+    if (targetBookingId && String(bookingId || "").trim() && targetBookingId !== String(bookingId || "").trim()) {
+      return;
+    }
+
+    const actionType = String(payload.action || "").toLowerCase();
+    const replacementText = String(payload.replacementText || "").trim();
+    const confirmed = payload.confirmed === true;
+
+    const latestOwnMessage = [...messages]
+      .reverse()
+      .find((msg) => msg?.senderRole === senderRole && String(msg?.messageId || "").trim());
+
+    if (!latestOwnMessage) {
+      processedAutomationIdsRef.current.add(actionId);
+      setAutomationNotice("No editable or deletable sent message found in this chat yet.");
+      onAutomationHandled?.();
+      return;
+    }
+
+    if (actionType === "edit_last") {
+      if (!replacementText) {
+        processedAutomationIdsRef.current.add(actionId);
+        setAutomationNotice("Edit command needs replacement text. Example: edit last message to 'I will arrive in 10 minutes'.");
+        onAutomationHandled?.();
+        return;
+      }
+
+      if (!confirmed) {
+        setEditingMsg({ messageId: latestOwnMessage.messageId, originalText: latestOwnMessage.text });
+        setInputText(replacementText);
+        setAutomationNotice("Draft prepared. To execute safely, send command with explicit confirm.");
+        processedAutomationIdsRef.current.add(actionId);
+        onAutomationHandled?.();
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.messageId === latestOwnMessage.messageId ? { ...msg, text: replacementText, edited: true } : msg
+        )
+      );
+      socketRef.current?.emit("chat:edit", {
+        bookingId,
+        messageId: latestOwnMessage.messageId,
+        text: replacementText
+      });
+      setEditingMsg(null);
+      setInputText("");
+      setAutomationNotice("Latest message edited from chatbot command.");
+      processedAutomationIdsRef.current.add(actionId);
+      onAutomationHandled?.();
+      return;
+    }
+
+    if (actionType === "delete_last") {
+      if (!confirmed) {
+        setIsSelectMode(true);
+        setSelectedIds(new Set([latestOwnMessage.messageId]));
+        setAutomationNotice("Message selected. To delete safely, send command with explicit confirm.");
+        processedAutomationIdsRef.current.add(actionId);
+        onAutomationHandled?.();
+        return;
+      }
+
+      const messageIds = [latestOwnMessage.messageId];
+      setMessages((prev) => prev.filter((msg) => !messageIds.includes(msg.messageId)));
+      messageIds.forEach((id) => seenIds.current.delete(id));
+      setSelectedIds(new Set());
+      setIsSelectMode(false);
+      socketRef.current?.emit("chat:delete", { bookingId, messageIds });
+      setAutomationNotice("Latest message deleted from chatbot command.");
+      processedAutomationIdsRef.current.add(actionId);
+      onAutomationHandled?.();
+      return;
+    }
+
+    processedAutomationIdsRef.current.add(actionId);
+    onAutomationHandled?.();
+  }, [
+    automationAction,
+    bookingId,
+    loading,
+    messages,
+    onAutomationHandled,
+    open,
+    senderRole
+  ]);
+
   if (!mounted) return null;
 
   const selectedOwnCount = [...selectedIds].filter((id) =>
@@ -386,9 +555,26 @@ function ChatModal({
                   <p className="font-semibold text-gray-900 text-sm leading-tight truncate">
                     {counterpartName || "Chat"}
                   </p>
-                  <p className={`text-xs leading-tight ${otherOnline ? "text-green-500" : "text-gray-400"}`}>
-                    {otherOnline ? "Online" : "Offline"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className={`text-xs leading-tight ${otherOnline ? "text-green-500" : "text-gray-400"}`}>
+                      {otherOnline ? "Online" : "Offline"}
+                    </p>
+                    {unreadCount > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleMarkAllAsRead}
+                          className="px-2 py-1 rounded text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                          title="Mark all as read"
+                        >
+                          Mark read
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <button type="button" onClick={onClose}
@@ -401,7 +587,12 @@ function ChatModal({
         </div>
 
         {/* ── message list ── */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50 overscroll-contain">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50 overscroll-contain relative">
+          {automationNotice && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+              {automationNotice}
+            </div>
+          )}
           {loading && <p className="text-center text-sm text-gray-400 py-8">Loading messages...</p>}
           {!loading && error && <p className="text-center text-sm text-red-500 py-6">{error}</p>}
           {!loading && !error && messages.length === 0 && (
@@ -442,7 +633,7 @@ function ChatModal({
                     <div
                       className={`min-w-0 px-3.5 py-2 rounded-2xl text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap shadow-sm transition-colors select-none ${
                         isOwn
-                          ? `text-white rounded-br-sm ${isSelected ? "bg-blue-400" : "bg-blue-600"}`
+                          ? `text-white rounded-br-sm ${isSelected ? "bg-blue-400" : msg.status === "failed" ? "bg-red-500 opacity-80" : "bg-blue-600"}`
                           : "bg-white text-gray-900 border border-gray-200 rounded-bl-sm"
                       }`}
                       onDoubleClick={() => onBubbleDblClick(msg.messageId, isOwn)}
@@ -451,21 +642,63 @@ function ChatModal({
                       onTouchMove={onBubbleTouchEnd}
                     >
                       {msg.text}
+                      {isOwn && msg.status === "failed" && (
+                        <span className="ml-2 text-xs italic opacity-75">Failed to send</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* time + tick + edited */}
-                  <div className={`flex items-center gap-1 px-1 ${isOwn ? "flex-row" : "flex-row-reverse"}`}>
+                  {/* time + tick + edited + actions */}
+                  <div className={`flex items-center gap-1 px-1 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                     <span className="text-[10px] text-gray-400">{formatMsgTime(msg.timestamp)}</span>
                     {msg.edited && (
                       <span className="text-[10px] text-gray-400 italic">edited</span>
                     )}
                     {isOwn && <TickIcon status={msg.status} />}
+                    {!isOwn && !isSelectMode && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputText(`"${msg.text.slice(0, 50)}..."`);
+                          inputRef.current?.focus();
+                        }}
+                        className="text-gray-400 hover:text-blue-600 p-0.5 rounded text-[10px] font-medium"
+                        title="Reply to this message"
+                      >
+                        ↩
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             );
           })}
+          {otherIsTyping && (
+            <div className="flex justify-start">
+              <div className="flex gap-1 px-4 py-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          )}
+          
+          {showJumpButton && (
+            <div className="sticky bottom-4 flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoScroll(true);
+                  scrollToBottom();
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-md"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+                Latest
+              </button>
+            </div>
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
 

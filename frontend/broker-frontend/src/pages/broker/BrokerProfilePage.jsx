@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom"; // Added for the fix
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, CheckCircle, Copy, Share2, ShieldAlert, X } from "lucide-react";
 import ProfileImagePicker from "@shared/components/ProfileImagePicker";
 
 const PHONE_REGEX = /^\d{10,13}$/;
+const TAKEN_USERNAMES = new Set(["admin", "support", "broker", "help", "root"]);
 
 function toDateInputValue(date) {
   return date.toISOString().split("T")[0];
@@ -17,9 +19,15 @@ function normalizeBrokerProfileState(value = {}) {
     gender: String(value.gender || ""),
     dateOfBirth: String(value.dateOfBirth || ""),
     phone: String(value.phone || ""),
+    secondaryEmail: String(value.secondaryEmail || ""),
+    twoFactorEnabled: Boolean(value.twoFactorEnabled),
     photoUrl: String(value.photoUrl || ""),
     brokerCode: String(value.brokerCode || "")
   };
+}
+
+function normalizeUsername(str) {
+  return String(str || "").toLowerCase().trim().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
 }
 
 function BrokerProfilePage({
@@ -37,6 +45,8 @@ function BrokerProfilePage({
   const navigate = useNavigate();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState("idle");
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null, error: null });
+  const usernameCheckRef = useRef(null);
   const minBrokerDob = (() => {
     const date = new Date();
     date.setFullYear(date.getFullYear() - 60);
@@ -55,6 +65,20 @@ function BrokerProfilePage({
     const initial = normalizeBrokerProfileState(profileInitialForm);
     return Object.keys(current).some((key) => current[key] !== initial[key]);
   }, [profileForm, profileInitialForm]);
+  const profileCompletion = useMemo(() => {
+    const fields = [
+      { key: "name", weight: 20 },
+      { key: "email", weight: 20 },
+      { key: "phone", weight: 20 },
+      { key: "photoUrl", weight: 20 },
+      { key: "bio", weight: 12 },
+      { key: "gender", weight: 4 },
+      { key: "dateOfBirth", weight: 4 }
+    ];
+    const totalWeight = fields.reduce((sum, f) => sum + f.weight, 0);
+    const completedWeight = fields.filter((f) => profileForm[f.key]).reduce((sum, f) => sum + f.weight, 0);
+    return Math.round((completedWeight / totalWeight) * 100);
+  }, [profileForm]);
   const brokerCode = String(profileForm.brokerCode || "").trim().toUpperCase();
   const totalWorkers = Number(stats.totalWorkers || 0);
   const activeBookings = Number(stats.activeBookings || 0);
@@ -77,7 +101,6 @@ function BrokerProfilePage({
     if (!brokerCode) {
       return;
     }
-
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(brokerCode);
@@ -97,6 +120,30 @@ function BrokerProfilePage({
     }
   };
 
+  useEffect(() => {
+    const username = normalizeUsername(profileForm.name);
+    if (!username || username.length < 3) {
+      setUsernameStatus({ checking: false, available: null, error: null });
+      return;
+    }
+
+    setUsernameStatus({ checking: true, available: null, error: null });
+    if (usernameCheckRef.current) {
+      clearTimeout(usernameCheckRef.current);
+    }
+
+    usernameCheckRef.current = setTimeout(() => {
+      const isAvailable = !TAKEN_USERNAMES.has(username);
+      setUsernameStatus({ checking: false, available: isAvailable, error: null });
+    }, 700);
+
+    return () => {
+      if (usernameCheckRef.current) {
+        clearTimeout(usernameCheckRef.current);
+      }
+    };
+  }, [profileForm.name]);
+
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
       <div className="max-w-2xl mx-auto">
@@ -113,12 +160,15 @@ function BrokerProfilePage({
         </div>
         <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
           <ProfileImagePicker
-            value={profileForm.photoUrl}
-            displayName={displayName}
-            onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
-          />
+            progress={profileCompletion || 0}
+            progressColorTheme="orange"
+                value={profileForm.photoUrl}
+                displayName={displayName}
+                onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
+              />
           <div>
             <h4 className="text-xl font-semibold text-gray-900">{displayName}</h4>
+            <p className="text-sm font-medium text-orange-600 mb-1">@{normalizeUsername(displayName || "broker")}</p>
             <p className="text-gray-600">{displayEmail}</p>
             <p className="text-gray-600">{displayPhone}</p>
             <div
@@ -142,6 +192,35 @@ function BrokerProfilePage({
               onChange={(event) => setProfileForm((prev) => ({ ...prev, name: event.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              type="text"
+              value={normalizeUsername(profileForm.name)}
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
+            <div className="mt-1 flex items-center gap-2 text-xs">
+              {usernameStatus.checking && (
+                <>
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-300 border-t-orange-600" />
+                  <span className="text-orange-600">Checking availability...</span>
+                </>
+              )}
+              {usernameStatus.available === true && (
+                <>
+                  <span className="h-3 w-3 rounded-full bg-green-600" />
+                  <span className="font-medium text-green-600">Available!</span>
+                </>
+              )}
+              {usernameStatus.available === false && (
+                <>
+                  <span className="h-3 w-3 rounded-full bg-red-600" />
+                  <span className="font-medium text-red-600">Already taken</span>
+                </>
+              )}
+            </div>
           </div>
           <div>
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -258,7 +337,7 @@ function BrokerProfilePage({
         </div>
       </div>
 
-      {emailVerification.open && (
+      {emailVerification.open && createPortal(
         <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <h4 className="text-lg font-bold text-slate-900">Verify New Email</h4>
@@ -306,10 +385,11 @@ function BrokerProfilePage({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {shareModalOpen && (
+      {shareModalOpen && createPortal(
         <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -373,7 +453,8 @@ function BrokerProfilePage({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

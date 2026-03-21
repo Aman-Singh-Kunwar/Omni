@@ -1,9 +1,11 @@
-import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, ShieldAlert } from "lucide-react";
 import ProfileImagePicker from "@shared/components/ProfileImagePicker";
 
 const PHONE_REGEX = /^\d{10,13}$/;
+const TAKEN_USERNAMES = new Set(["admin", "support", "customer", "help", "root"]);
 
 function toDateInputValue(date) {
   return date.toISOString().split("T")[0];
@@ -17,10 +19,15 @@ function normalizeProfileState(value = {}) {
     gender: String(value.gender || ""),
     dateOfBirth: String(value.dateOfBirth || ""),
     phone: String(value.phone || ""),
+    secondaryEmail: String(value.secondaryEmail || ""),
+    twoFactorEnabled: Boolean(value.twoFactorEnabled),
     photoUrl: String(value.photoUrl || "")
   };
 }
 
+function normalizeUsername(str) {
+  return String(str || "").toLowerCase().trim().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
+}
 function CustomerProfilePage({
   userName,
   userEmail,
@@ -35,6 +42,10 @@ function CustomerProfilePage({
   onVerifyEmailChange
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const emailInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
+  const bioInputRef = useRef(null);
   const handleBackClick = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -57,6 +68,58 @@ function CustomerProfilePage({
   const isPhoneValid = !normalizedPhone || PHONE_REGEX.test(normalizedPhone);
   const emailVerified = profileForm.emailVerified !== false;
 
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null, error: null });
+  const usernameCheckRef = useRef(null);
+  const profileCompletion = useMemo(() => {
+    const fields = [
+      { key: "name", weight: 20 },
+      { key: "email", weight: 20 },
+      { key: "phone", weight: 15 },
+      { key: "photoUrl", weight: 15 },
+      { key: "bio", weight: 15 },
+      { key: "gender", weight: 8 },
+      { key: "dateOfBirth", weight: 7 }
+    ];
+    const totalWeight = fields.reduce((sum, f) => sum + f.weight, 0);
+    const completedWeight = fields.filter(f => profileForm[f.key]).reduce((sum, f) => sum + f.weight, 0);
+    return Math.round((completedWeight / totalWeight) * 100);
+  }, [profileForm]);
+  useEffect(() => {
+    const section = String(new URLSearchParams(location.search).get("section") || "").toLowerCase();
+    if (!section) return;
+
+    const sectionRef = section === "phone" ? phoneInputRef : section === "bio" ? bioInputRef : emailInputRef;
+    window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      sectionRef.current?.focus();
+    }, 120);
+  }, [location.search]);
+
+  useEffect(() => {
+    const username = normalizeUsername(profileForm.name);
+    if (!username || username.length < 3) {
+      setUsernameStatus({ checking: false, available: null, error: null });
+      return;
+    }
+    
+    setUsernameStatus({ checking: true, available: null, error: null });
+    
+    // Debounce the check by 800ms
+    if (usernameCheckRef.current) {
+      clearTimeout(usernameCheckRef.current);
+    }
+    
+    usernameCheckRef.current = setTimeout(() => {
+      const isAvailable = !TAKEN_USERNAMES.has(username);
+      setUsernameStatus({ checking: false, available: isAvailable, error: null });
+    }, 700);
+
+    return () => {
+      if (usernameCheckRef.current) {
+        clearTimeout(usernameCheckRef.current);
+      }
+    };
+  }, [profileForm.name]);
   return (
     <div className="bg-white/80 p-6 sm:p-8 rounded-xl shadow-sm border">
       <div className="mx-auto max-w-2xl">
@@ -74,12 +137,15 @@ function CustomerProfilePage({
 
         <div className="mb-8 flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left sm:gap-6">
           <ProfileImagePicker
-            value={profileForm.photoUrl}
-            displayName={profileForm.name || userName}
-            onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
-          />
+            progress={profileCompletion || 0}
+            progressColorTheme="blue"
+                value={profileForm.photoUrl}
+                displayName={profileForm.name || userName}
+                onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
+              />
           <div>
             <h4 className="text-xl font-semibold text-gray-900">{profileForm.name || userName}</h4>
+            <p className="text-sm font-medium text-blue-600 mb-1">@{normalizeUsername(profileForm.name || userName)}</p>
             <p className="text-gray-600">{profileForm.email || userEmail || "No email set"}</p>
             <p className="text-gray-600">{profileForm.phone || "No phone set"}</p>
             <div
@@ -105,6 +171,38 @@ function CustomerProfilePage({
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={normalizeUsername(profileForm.name)}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              />
+              <div className="mt-1 flex items-center gap-2 text-xs">
+                {usernameStatus.checking && (
+                  <>
+                    <div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                    <span className="text-blue-600">Checking availability...</span>
+                  </>
+                )}
+                {usernameStatus.available === true && (
+                  <>
+                    <span className="w-3 h-3 bg-green-600 rounded-full flex-shrink-0" />
+                    <span className="text-green-600 font-medium">Available!</span>
+                  </>
+                )}
+                {usernameStatus.available === false && (
+                  <>
+                    <span className="w-3 h-3 bg-red-600 rounded-full flex-shrink-0" />
+                    <span className="text-red-600 font-medium">Already taken</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Auto-generated from your name (letters, numbers, dashes, underscores only)</p>
+          </div>
+                <div>
             <div className="mb-1 flex items-center justify-between gap-2">
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <button
@@ -121,6 +219,7 @@ function CustomerProfilePage({
               </button>
             </div>
             <input
+              ref={emailInputRef}
               type="email"
               value={profileForm.email}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, email: event.target.value }))}
@@ -131,6 +230,7 @@ function CustomerProfilePage({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
             <input
+              ref={phoneInputRef}
               type="tel"
               value={profileForm.phone}
               onChange={(event) =>
@@ -172,12 +272,15 @@ function CustomerProfilePage({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
             <textarea
+              ref={bioInputRef}
               rows={3}
+              maxLength={500}
               value={profileForm.bio}
               onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
               placeholder="Tell us about yourself"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
             />
+            <p className="mt-1 text-right text-xs text-gray-500">{profileForm.bio.length}/500 characters</p>
           </div>
           {emailVerification.info && <p className="rounded bg-blue-100 px-3 py-2 text-sm text-blue-700">{emailVerification.info}</p>}
           {emailVerification.error && <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-700">{emailVerification.error}</p>}
@@ -196,8 +299,7 @@ function CustomerProfilePage({
           </button>
         </div>
       </div>
-
-      {emailVerification.open && (
+      {emailVerification.open && createPortal(
         <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <h4 className="text-lg font-bold text-slate-900">Verify New Email</h4>
@@ -245,7 +347,8 @@ function CustomerProfilePage({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

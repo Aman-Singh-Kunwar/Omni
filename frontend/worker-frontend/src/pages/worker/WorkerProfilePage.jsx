@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, ChevronDown, ShieldAlert } from "lucide-react";
 import ProfileImagePicker from "@shared/components/ProfileImagePicker";
 
 const PHONE_REGEX = /^\d{10,13}$/;
+const TAKEN_USERNAMES = new Set(["admin", "support", "worker", "help", "root"]);
 
 function toDateInputValue(date) {
   return date.toISOString().split("T")[0];
@@ -17,12 +19,17 @@ function normalizeWorkerProfileState(value = {}) {
     gender: String(value.gender || ""),
     dateOfBirth: String(value.dateOfBirth || ""),
     phone: String(value.phone || ""),
+    secondaryEmail: String(value.secondaryEmail || ""),
+    twoFactorEnabled: Boolean(value.twoFactorEnabled),
     photoUrl: String(value.photoUrl || ""),
     servicesProvided: String(value.servicesProvided || ""),
     isAvailable: Boolean(value.isAvailable)
   };
 }
 
+function normalizeUsername(str) {
+  return String(str || "").toLowerCase().trim().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
+}
 function WorkerProfilePage({
   authToken,
   profileForm,
@@ -36,8 +43,12 @@ function WorkerProfilePage({
   onVerifyEmailChange
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
   const servicesDropdownRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
+  const bioInputRef = useRef(null);
   const serviceOptions = [
     "Plumber",
     "Electrician",
@@ -75,6 +86,34 @@ function WorkerProfilePage({
   const isPhoneValid = !normalizedPhone || PHONE_REGEX.test(normalizedPhone);
   const emailVerified = profileForm.emailVerified !== false;
 
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null, error: null });
+  const usernameCheckRef = useRef(null);
+  const profileCompletion = useMemo(() => {
+    const fields = [
+      { key: "name", weight: 15 },
+      { key: "email", weight: 15 },
+      { key: "phone", weight: 15 },
+      { key: "photoUrl", weight: 15 },
+      { key: "bio", weight: 15 },
+      { key: "servicesProvided", weight: 15 },
+      { key: "gender", weight: 5 },
+      { key: "dateOfBirth", weight: 5 }
+    ];
+    const totalWeight = fields.reduce((sum, f) => sum + f.weight, 0);
+    const completedWeight = fields.filter(f => profileForm[f.key]).reduce((sum, f) => sum + f.weight, 0);
+    return Math.round((completedWeight / totalWeight) * 100);
+  }, [profileForm]);
+  useEffect(() => {
+    const section = String(new URLSearchParams(location.search).get("section") || "").toLowerCase();
+    if (!section) return;
+
+    const sectionRef = section === "phone" ? phoneInputRef : section === "bio" ? bioInputRef : emailInputRef;
+    window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      sectionRef.current?.focus();
+    }, 120);
+  }, [location.search]);
+
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(event.target)) {
@@ -96,6 +135,29 @@ function WorkerProfilePage({
     }
   }, [profileStatus.success]);
 
+  useEffect(() => {
+    const username = normalizeUsername(profileForm.name);
+    if (!username || username.length < 3) {
+      setUsernameStatus({ checking: false, available: null, error: null });
+      return;
+    }
+
+    setUsernameStatus({ checking: true, available: null, error: null });
+    if (usernameCheckRef.current) {
+      clearTimeout(usernameCheckRef.current);
+    }
+
+    usernameCheckRef.current = setTimeout(() => {
+      const isAvailable = !TAKEN_USERNAMES.has(username);
+      setUsernameStatus({ checking: false, available: isAvailable, error: null });
+    }, 700);
+
+    return () => {
+      if (usernameCheckRef.current) {
+        clearTimeout(usernameCheckRef.current);
+      }
+    };
+  }, [profileForm.name]);
   const toggleService = (service) => {
     const nextServices = selectedServices.includes(service)
       ? selectedServices.filter((selected) => selected !== service)
@@ -130,12 +192,15 @@ function WorkerProfilePage({
         </div>
         <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6 mb-8">
           <ProfileImagePicker
-            value={profileForm.photoUrl}
-            displayName={displayName}
-            onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
-          />
+            progress={profileCompletion || 0}
+            progressColorTheme="emerald"
+                value={profileForm.photoUrl}
+                displayName={displayName}
+                onChange={(photoUrl) => setProfileForm((prev) => ({ ...prev, photoUrl }))}
+              />
           <div>
             <h4 className="text-xl font-semibold text-gray-900">{displayName}</h4>
+            <p className="text-sm font-medium text-emerald-600 mb-1">@{normalizeUsername(displayName || "worker")}</p>
             <p className="text-gray-600">{displayEmail}</p>
             <p className="text-gray-600">{displayPhone}</p>
             <div
@@ -164,7 +229,36 @@ function WorkerProfilePage({
                 onChange={(event) => setProfileForm((prev) => ({ ...prev, name: event.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
               />
+                <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <input
+                type="text"
+                value={normalizeUsername(profileForm.name)}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              />
+              <div className="mt-1 flex items-center gap-2 text-xs">
+                {usernameStatus.checking && (
+                  <>
+                    <div className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+                    <span className="text-emerald-600">Checking availability...</span>
+                  </>
+                )}
+                {usernameStatus.available === true && (
+                  <>
+                    <span className="w-3 h-3 bg-green-600 rounded-full flex-shrink-0" />
+                    <span className="text-green-600 font-medium">Available!</span>
+                  </>
+                )}
+                {usernameStatus.available === false && (
+                  <>
+                    <span className="w-3 h-3 bg-red-600 rounded-full flex-shrink-0" />
+                    <span className="text-red-600 font-medium">Already taken</span>
+                  </>
+                )}
+              </div>
             </div>
+        </div>
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -182,6 +276,7 @@ function WorkerProfilePage({
                 </button>
               </div>
               <input
+                ref={emailInputRef}
                 type="email"
                 value={profileForm.email}
                 onChange={(event) => setProfileForm((prev) => ({ ...prev, email: event.target.value }))}
@@ -192,6 +287,7 @@ function WorkerProfilePage({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input
+                ref={phoneInputRef}
                 type="tel"
                 value={profileForm.phone}
                 onChange={(event) =>
@@ -234,12 +330,15 @@ function WorkerProfilePage({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
               <textarea
+                ref={bioInputRef}
                 rows={3}
+                maxLength={500}
                 value={profileForm.bio}
                 onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
                 placeholder="Tell customers about your experience"
               />
+              <p className="mt-1 text-right text-xs text-gray-500">{profileForm.bio.length}/500 characters</p>
             </div>
 
             <div>
@@ -298,7 +397,7 @@ function WorkerProfilePage({
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 mb-4">
               <input
                 type="checkbox"
                 checked={profileForm.isAvailable}
@@ -306,6 +405,7 @@ function WorkerProfilePage({
               />
               Mark me as currently available
             </label>
+
             {emailVerification.info && <p className="rounded bg-blue-100 px-3 py-2 text-sm text-blue-700">{emailVerification.info}</p>}
             {emailVerification.error && <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-700">{emailVerification.error}</p>}
             {profileStatus.error && <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-700">{profileStatus.error}</p>}
@@ -325,7 +425,7 @@ function WorkerProfilePage({
         )}
       </div>
 
-      {emailVerification.open && (
+      {emailVerification.open && createPortal(
         <div className="fixed inset-0 z-50 !m-0 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <h4 className="text-lg font-bold text-slate-900">Verify New Email</h4>
@@ -373,7 +473,8 @@ function WorkerProfilePage({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

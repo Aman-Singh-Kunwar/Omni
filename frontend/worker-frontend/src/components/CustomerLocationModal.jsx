@@ -62,7 +62,7 @@ function InitialFit({ workerPosition, customerPosition }) {
   return null;
 }
 
-function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSharing = false }) {
+function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSharing = false, autoStopSharing = false }) {
   const [workerPosition, setWorkerPosition] = useState(null);
   const [gpsError, setGpsError] = useState("");
   const [isSharing, setIsSharing] = useState(false);
@@ -70,6 +70,11 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
   const [routeDuration, setRouteDuration] = useState(null);
   const [mapTile, setMapTile] = useState("street");
   const [geocodedArea, setGeocodedArea] = useState(null);
+
+  const [gpsAccuracy, setGpsAccuracy] = useState(0);
+  const [lastSentTime, setLastSentTime] = useState(null);
+  const [showSafetyNotice, setShowSafetyNotice] = useState(false);
+  const [hasConfirmedSafety, setHasConfirmedSafety] = useState(false);
 
   const socketRef = useRef(null);
   const watchIdRef = useRef(null);
@@ -119,6 +124,7 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastPositionRef.current = loc;
         setWorkerPosition(loc);
+        setGpsAccuracy(pos.coords.accuracy);
         setGpsError("");
       },
       (err) => setGpsError(`GPS error: ${err.message}`),
@@ -190,10 +196,16 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
       socketRef.current = null;
     }
     setIsSharing(false);
+    setLastSentTime(null);
   }, []);
 
   const startSharing = useCallback(() => {
     if (!authToken || !bookingId) return;
+    
+    if (!hasConfirmedSafety) {
+      setShowSafetyNotice(true);
+      return;
+    }
 
     const socket = createRealtimeSocket(authToken);
     if (!socket) return;
@@ -212,16 +224,22 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
 
       lastEmittedPosRef.current = pos;
       socketRef.current.emit("worker:location", { bookingId, lat: pos.lat, lng: pos.lng });
+      setLastSentTime(new Date());
     }, 1000);
 
     shareIntervalRef.current = interval;
     setIsSharing(true);
-  }, [authToken, bookingId]);
+  }, [authToken, bookingId, hasConfirmedSafety]);
 
   useEffect(() => {
     if (!open || !autoStartSharing || isSharing || !workerPosition) return;
     startSharing();
   }, [autoStartSharing, isSharing, open, startSharing, workerPosition]);
+
+  useEffect(() => {
+    if (!open || !autoStopSharing || !isSharing) return;
+    stopSharing();
+  }, [autoStopSharing, isSharing, open, stopSharing]);
 
   // Warn before browser tab/window close while sharing is active
   useEffect(() => {
@@ -233,7 +251,12 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isSharing]);
-
+  // Auto-stop if booking completes or socket context is gone
+  useEffect(() => {
+    if (isSharing && (booking?.status === "completed" || booking?.status === "cancelled" || !authToken)) {
+      stopSharing();
+    }
+  }, [booking?.status, authToken, isSharing, stopSharing]);
   // Clean up on close — but only stop sharing if worker is NOT actively sharing
   useEffect(() => {
     if (!open) {
@@ -268,10 +291,35 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
     };
   }, [stopSharing]);
 
-  if (!open || typeof document === "undefined") return null;
+  // Show background indicator if closed but sharing
+  if (typeof document === "undefined") return null;
+  
+  if (!open) {
+    if (isSharing) {
+      const p = (
+        <div className="fixed bottom-24 right-4 z-[90] flex flex-col items-end gap-2 animate-in fade-in slide-in-from-bottom-5">
+            <button 
+              onClick={() => stopSharing()}
+              className="group flex flex-row-reverse items-center justify-end rounded-full bg-red-600 pl-3 pr-1 py-1 text-xs font-semibold text-white shadow-lg shadow-red-500/30 hover:bg-red-700 hover:shadow-red-600/40"
+            >
+              <div className="h-6 w-6 ml-2 rounded-full bg-white flex items-center justify-center text-red-600">
+                <X className="h-4 w-4" />
+              </div>
+              Stop GPS
+            </button>
+            <div className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30">
+              <Radio className="h-4 w-4 animate-pulse" />
+              Sharing Location
+              <div className="h-2 w-2 rounded-full animate-bounce bg-green-300 ml-1" />
+            </div>
+        </div>
+      );
+      return createPortal(p, document.body);
+    }
+    return null;
+  }
 
   const handleClose = () => {
-    if (isSharing) return;
     onClose();
   };
 
@@ -296,10 +344,9 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
             <button
               type="button"
               onClick={handleClose}
-              disabled={isSharing}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Close"
-              title={isSharing ? "Stop sharing before closing" : "Close"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              aria-label={isSharing ? "Minimize Map" : "Close"}
+              title={isSharing ? "Minimize Map" : "Close"}
             >
               <X className="h-4 w-4" />
             </button>
@@ -320,6 +367,34 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
             {gpsError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {gpsError}
+              </div>
+            )}
+            
+            {!gpsError && gpsAccuracy > 50 && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800 flex items-center gap-2">
+                <Radio className="h-4 w-4" />
+                GPS signal is weak ({Math.round(gpsAccuracy)}m accuracy). Your customer might see an inaccurate location.
+              </div>
+            )}
+
+            {showSafetyNotice && !hasConfirmedSafety && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mt-2">
+                <p className="font-semibold mb-1">Safety Notice</p>
+                <p className="mb-3 text-xs text-blue-700">Live sharing enables continuous GPS background tracking until you stop it or complete the job. Please drive safely.</p>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setHasConfirmedSafety(true); setShowSafetyNotice(false); startSharing(); }}
+                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-blue-700"
+                  >
+                    I Understand, Start Sharing
+                  </button>
+                  <button 
+                    onClick={() => setShowSafetyNotice(false)}
+                    className="border border-blue-300 text-blue-700 px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-blue-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
 
@@ -421,33 +496,66 @@ function CustomerLocationModal({ open, onClose, booking, authToken, autoStartSha
             {/* Share toggle + close */}
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-4">
               {isSharing && (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                  Location sharing is active. Stop sharing before closing this panel or leaving the page.
+                <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                  Location sharing is active in the background. You can minimize this panel and the customer will still see your updates.
                 </p>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={isSharing ? stopSharing : startSharing}
-                  disabled={!workerPosition}
-                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    isSharing
-                      ? "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                >
-                  <Radio className={`h-4 w-4 ${isSharing ? "animate-pulse" : ""}`} />
-                  {isSharing ? "Stop Sharing Location" : "Share My Location Live"}
-                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={isSharing ? stopSharing : startSharing}
+                    disabled={!workerPosition}
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      isSharing
+                        ? "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    <Radio className={`h-4 w-4 ${isSharing ? "animate-pulse" : ""}`} />
+                    {isSharing ? "Stop Sharing Location" : "Share My Location Live"}
+                  </button>
+                  {isSharing && lastSentTime && (
+                    <p className="text-[10px] text-slate-500 mt-1 pl-1">
+                      Last uploaded: {lastSentTime.toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+
+                {isSharing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.geolocation && socketRef.current && isSharing) {
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                            setWorkerPosition(newPos);
+                            setLastSentTime(new Date());
+                            socketRef.current.emit("worker:location", {
+                              bookingId: booking.id,
+                              location: newPos
+                            });
+                          },
+                          null,
+                          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                        );
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                  >
+                    <Navigation className="h-4 w-4" />
+                    Send location now
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={handleClose}
-                  disabled={isSharing}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  title={isSharing ? "Stop sharing before closing" : undefined}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  title={isSharing ? "Minimize Map" : undefined}
                 >
-                  Close
+                  {isSharing ? "Minimize Map" : "Close"}
                 </button>
               </div>
             </div>

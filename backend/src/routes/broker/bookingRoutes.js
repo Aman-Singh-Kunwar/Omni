@@ -47,7 +47,9 @@ router.get("/broker/bookings", async (req, res, next) => {
         brokerCommissionRate: 1,
         brokerCode: 1,
         brokerId: 1,
-        brokerName: 1
+        brokerName: 1,
+        createdAt: 1,
+        updatedAt: 1
       })
       .sort({ updatedAt: -1, createdAt: -1 })
       .lean();
@@ -64,7 +66,10 @@ router.get("/broker/bookings", async (req, res, next) => {
         amount: getBookingTotalAmount(booking),
         brokerCommission: calculateBrokerCommissionAmount(booking),
         rating: typeof booking.rating === "number" ? booking.rating : 0,
-        status: booking.status
+        status: booking.status,
+        brokerCode: String(booking.brokerCode || "").trim().toUpperCase(),
+        createdAt: booking.createdAt || null,
+        completedAt: booking.updatedAt || null
       }));
 
     return res.json({

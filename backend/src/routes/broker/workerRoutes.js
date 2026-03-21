@@ -38,6 +38,9 @@ router.get("/broker/workers", async (req, res, next) => {
             originalAmount: 1,
             discountAmount: 1,
             discountPercent: 1,
+            brokerId: 1,
+            brokerCode: 1,
+            brokerName: 1,
             brokerCommissionAmount: 1,
             brokerCommissionRate: 1,
             rating: 1

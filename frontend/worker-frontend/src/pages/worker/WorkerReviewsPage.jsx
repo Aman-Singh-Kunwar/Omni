@@ -1,5 +1,5 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays, MessageSquareText, Star } from "lucide-react";
 
 function renderStars(rating) {
@@ -40,6 +40,8 @@ function normalizeReviewMedia(items = []) {
 
 function WorkerReviewsPage({ reviews = [] }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const starsFilter = Number(new URLSearchParams(location.search).get("stars") || 0);
   const handleBackClick = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -47,12 +49,19 @@ function WorkerReviewsPage({ reviews = [] }) {
     }
     navigate("/");
   };
-  const submittedReviews = reviews.filter((review) => {
+  const submittedReviews = useMemo(() => reviews.filter((review) => {
     const rating = Number(review.rating || 0);
     const feedback = String(review.feedback || "").trim();
     const feedbackMedia = Array.isArray(review.feedbackMedia) ? review.feedbackMedia : [];
     return rating > 0 || feedback.length > 0 || feedbackMedia.length > 0;
-  });
+  }), [reviews]);
+
+  const filteredReviews = useMemo(() => {
+    if (!Number.isFinite(starsFilter) || starsFilter < 1 || starsFilter > 5) {
+      return submittedReviews;
+    }
+    return submittedReviews.filter((review) => Number(review.rating || 0) === starsFilter);
+  }, [starsFilter, submittedReviews]);
 
   return (
     <div className="space-y-6">
@@ -68,11 +77,18 @@ function WorkerReviewsPage({ reviews = [] }) {
             Back
           </button>
         </div>
-        <p className="mt-1 text-sm text-gray-600">Feedback submitted by customers for completed or not-provided bookings.</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-gray-600">Feedback submitted by customers for completed or not-provided bookings.</p>
+          {Number.isFinite(starsFilter) && starsFilter >= 1 && starsFilter <= 5 && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              Filter: {starsFilter} star{starsFilter === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">
-        {submittedReviews.map((review) => (
+        {filteredReviews.map((review) => (
           <article key={review.id} className="rounded-2xl border border-gray-200/90 bg-white/90 p-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0 flex-1">
@@ -131,9 +147,9 @@ function WorkerReviewsPage({ reviews = [] }) {
           </article>
         ))}
 
-        {submittedReviews.length === 0 && (
+        {filteredReviews.length === 0 && (
           <div className="rounded-xl border bg-white/80 p-6 text-sm text-gray-500 shadow-sm">
-            No reviews submitted yet.
+            No reviews found for this filter.
           </div>
         )}
       </div>

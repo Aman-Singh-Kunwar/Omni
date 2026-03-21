@@ -66,7 +66,16 @@ function CareCategoriesSection({ searchQuery = "" }) {
           {servicesToRender.map((service) => (
             <article
               key={service.id}
-              className="group overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleExploreService(service.categorySlug, service.title)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleExploreService(service.categorySlug, service.title);
+                }
+              }}
+              className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <div className="relative aspect-[4/3] overflow-hidden">
                 <img
@@ -86,7 +95,10 @@ function CareCategoriesSection({ searchQuery = "" }) {
                 <p className="line-clamp-2 text-sm text-gray-600">{service.description || "Professional doorstep service."}</p>
                 <button
                   type="button"
-                  onClick={() => handleExploreService(service.categorySlug, service.title)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleExploreService(service.categorySlug, service.title);
+                  }}
                   className="pt-1 text-sm font-semibold text-gray-700 transition-colors duration-200 hover:text-gray-900"
                 >
                   Explore Service

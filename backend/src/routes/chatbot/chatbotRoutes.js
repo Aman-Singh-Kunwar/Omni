@@ -448,11 +448,97 @@ function parseBookingReferenceId(message) {
   return match ? String(match[1] || "").trim() : "";
 }
 
+function parseWorkerReferenceId(message) {
+  const raw = String(message || "");
+  const match = raw.match(/\bworker\s*(?:id|number|no\.?|#)?\s*[:\-]?\s*([A-Za-z0-9-]{4,})\b/i);
+  return match ? String(match[1] || "").trim() : "";
+}
+
+function parseEmailFromMessage(message) {
+  const raw = String(message || "");
+  const match = raw.match(/\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i);
+  return match ? String(match[1] || "").trim().toLowerCase() : "";
+}
+
+function parseOtpFromMessage(message) {
+  const raw = String(message || "");
+  const otpWithLabelMatch = raw.match(/\b(?:otp|code|verification code)\s*[:\-]?\s*(\d{6})\b/i);
+  if (otpWithLabelMatch) return String(otpWithLabelMatch[1] || "").trim();
+
+  const plainMatch = raw.match(/\b(\d{6})\b/);
+  return plainMatch ? String(plainMatch[1] || "").trim() : "";
+}
+
+function parseMonthFilterFromMessage(message) {
+  const lower = String(message || "").toLowerCase();
+  if (/\b(this month|current month)\b/i.test(lower)) return "current";
+  if (/\b(last month|previous month|past month)\b/i.test(lower)) return "last";
+
+  const monthNames = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december"
+  ];
+  const matchedMonthIndex = monthNames.findIndex((name) => new RegExp(`\\b${name}\\b`, "i").test(lower));
+  if (matchedMonthIndex === -1) return "";
+
+  const now = new Date();
+  const year = now.getFullYear();
+  return `${year}-${String(matchedMonthIndex + 1).padStart(2, "0")}`;
+}
+
+function parseStarBandFromMessage(message) {
+  const raw = String(message || "").toLowerCase();
+  const numericMatch = raw.match(/\b([1-5])\s*(?:star|stars)\b/i);
+  if (numericMatch) return String(numericMatch[1] || "");
+
+  const wordsToStars = {
+    one: "1",
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5"
+  };
+  const wordMatch = raw.match(/\b(one|two|three|four|five)\s*(?:star|stars)\b/i);
+  if (wordMatch) {
+    return wordsToStars[String(wordMatch[1] || "").toLowerCase()] || "";
+  }
+
+  return "";
+}
+
 function parseDescriptionFromMessage(message) {
   const lower = String(message || "");
   const match = lower.match(/(?:description|desc|note|details|requirement|मेरी डिटेल|विवरण)\s*[:\-]?\s*(.+)$/i);
   if (!match) return "";
   return normalizeMessageText(match[1], 220);
+}
+
+function parseChatEditReplacementText(message) {
+  const raw = String(message || "");
+  const patterns = [
+    /(?:edit|change|update)\s+(?:my\s+)?(?:last\s+)?(?:chat\s+)?message\s*(?:to|as)\s*[:\-]?\s*(.+)$/i,
+    /(?:message|chat)\s*(?:to|as)\s*[:\-]?\s*(.+)$/i,
+    /(?:replace\s+with)\s*[:\-]?\s*(.+)$/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match && match[1]) {
+      return normalizeMessageText(match[1], 500);
+    }
+  }
+
+  return "";
 }
 
 function deriveServiceRouteFromPath(pathname) {
@@ -551,17 +637,225 @@ function buildCustomerAutomationAction(message, routeContext = {}) {
 
   const wantsTracking = /\b(track|tracking|booking status|where is|status|ट्रैक|स्थिति)\b/i.test(lower);
   const wantsBookingChat = /\b(chat|message|talk|contact worker|worker se baat|चैट|मैसेज|संदेश)\b/i.test(lower);
-  if (!wantsTracking && !wantsBookingChat) {
+  const wantsChatEdit = /\b(edit|change|update)\b.*\b(chat|message)\b|\b(chat|message)\b.*\b(edit|change|update)\b/i.test(lower);
+  const wantsChatDelete = /\b(delete|remove|erase)\b.*\b(chat|message)\b|\b(chat|message)\b.*\b(delete|remove|erase)\b/i.test(lower);
+  const wantsPayment = /\b(pay|payment|pay now|booking pay|भुगतान|पेमेंट)\b/i.test(lower);
+  const wantsNotProvided = /\b(not provided|service not done|didn't come|worker nahi aaya|नहीं आया|सर्विस नहीं मिली)\b/i.test(lower);
+  const wantsReview = /\b(review|feedback|rating|rate service|edit feedback|रिव्यू|रेटिंग|फीडबैक)\b/i.test(lower);
+  const wantsReviewTab = /\b(open review tab|go to review tab|review section|jump to review|review panel)\b/i.test(lower);
+  const wantsReviewMedia = /\b(upload|attach|add)\b.*\b(photo|image|video|media|proof)\b|\b(review media|feedback media|photo proof|video proof)\b/i.test(lower);
+  const wantsBookingDetails = /\b(booking details|open booking details|show booking details|open booking card|booking card details)\b/i.test(lower);
+  const wantsDeleteBooking = /\b(delete booking|remove booking|booking delete|booking hatao|बुकिंग हटाओ|बुकिंग डिलीट)\b/i.test(lower);
+  const wantsCancelBooking = /\b(cancel booking|booking cancel|बुकिंग cancel|बुकिंग रद्द|cancel my booking)\b/i.test(lower);
+
+  if (wantsChatEdit || wantsChatDelete) {
+    const confirmed = /\b(confirm|confirmed|yes|proceed|sure)\b/i.test(lower);
+    return {
+      type: "chat_message_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: wantsChatDelete ? "delete_last" : "edit_last",
+        replacementText: wantsChatDelete ? "" : parseChatEditReplacementText(message),
+        confirmed,
+        bookingId: parseBookingReferenceId(message),
+        navigateTo: onBookingsPage ? null : "/bookings"
+      }
+    };
+  }
+
+  if (
+    !wantsTracking &&
+    !wantsBookingChat &&
+    !wantsPayment &&
+    !wantsNotProvided &&
+    !wantsReview &&
+    !wantsReviewTab &&
+    !wantsReviewMedia &&
+    !wantsBookingDetails &&
+    !wantsDeleteBooking &&
+    !wantsCancelBooking
+  ) {
     return null;
   }
+
+  const bookingsAction = wantsTracking
+    ? "open_tracking"
+    : wantsBookingChat
+      ? "open_chat"
+      : wantsPayment
+        ? "open_payment"
+        : wantsNotProvided
+          ? "open_not_provided"
+          : wantsReviewTab
+            ? "open_review_tab"
+            : wantsReviewMedia
+              ? "open_review_media"
+          : wantsReview
+            ? "open_review"
+            : wantsDeleteBooking
+              ? "open_delete"
+              : wantsBookingDetails
+                ? "open_booking_details"
+              : "open_cancel";
 
   return {
     type: "customer_bookings_action",
     payload: {
       id: `act-${Date.now()}`,
-      action: wantsTracking ? "open_tracking" : "open_chat",
+      action: bookingsAction,
       bookingId: parseBookingReferenceId(message),
       navigateTo: onBookingsPage ? null : "/bookings"
+    }
+  };
+}
+
+function buildBrokerAutomationAction(message, routeContext = {}) {
+  const lower = String(message || "").toLowerCase();
+  const routePath = String(routeContext.path || "");
+  const onWorkersPage = isOnPathPrefix(routePath, "/workers");
+  const onOverviewPage = isSamePath(routePath, "/");
+  const onProfilePage = isOnPathPrefix(routePath, "/profile");
+
+  const wantsOpenWorkers = /\b(workers|my workers|worker list|linked workers|network workers|show workers)\b/i.test(lower);
+  const wantsShareCode = /\b(share broker code|share code|broker code share|code share karo)\b/i.test(lower);
+  const wantsCopyCode = /\b(copy broker code|copy code|broker code copy|code copy)\b/i.test(lower);
+  const wantsWorkerProfile = /\b(worker profile|open worker profile|view worker profile|worker details)\b/i.test(lower);
+  const wantsTopWorkerProfile = /\b(top worker|best worker|highest worker|top performing worker)\b/i.test(lower);
+  const wantsOpenEmailVerify = /\b(open email verification|open verify email|email verification modal|verify email popup)\b/i.test(lower);
+  const wantsResendOtp = /\b(resend otp|send otp again|resend verification code|send verification code again)\b/i.test(lower);
+  const wantsVerifyOtp = /\b(verify otp|verify code|otp verify|confirm otp)\b/i.test(lower);
+
+  if (wantsOpenEmailVerify || wantsResendOtp || wantsVerifyOtp) {
+    const pendingEmail = parseEmailFromMessage(message);
+    const otpCode = parseOtpFromMessage(message);
+    const hasConfirmation = /\b(confirm|confirmed|yes verify|proceed verify|i confirm|strict confirm)\b/i.test(lower);
+
+    const profileAction = wantsResendOtp ? "resend_email_otp" : wantsVerifyOtp ? "verify_email_otp" : "open_email_verify";
+
+    return {
+      type: "broker_profile_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: profileAction,
+        pendingEmail,
+        otpCode,
+        confirmed: hasConfirmation,
+        navigateTo: onProfilePage ? null : "/profile"
+      }
+    };
+  }
+
+  if (!wantsOpenWorkers && !wantsShareCode && !wantsCopyCode && !wantsWorkerProfile && !wantsTopWorkerProfile) {
+    return null;
+  }
+
+  const workerId = parseWorkerReferenceId(message);
+  let action = "open_workers";
+  let navigateTo = onWorkersPage ? null : "/workers";
+
+  if (wantsWorkerProfile) {
+    action = "open_worker_profile";
+    navigateTo = workerId ? `/worker-profile?workerId=${encodeURIComponent(workerId)}` : "/workers";
+  } else if (wantsTopWorkerProfile) {
+    action = "open_top_worker_profile";
+    navigateTo = onOverviewPage ? null : "/";
+  } else if (wantsCopyCode) {
+    action = "copy_code";
+    navigateTo = "/workers?chatbotAction=copy";
+  } else if (wantsShareCode) {
+    action = "open_share_modal";
+    navigateTo = "/workers?chatbotAction=share";
+  }
+
+  return {
+    type: "broker_workers_action",
+    payload: {
+      id: `act-${Date.now()}`,
+      action,
+      workerId,
+      navigateTo
+    }
+  };
+}
+
+function buildSharedDashboardAutomationAction(message, role, routeContext = {}) {
+  if (!role || role === "landing") return null;
+
+  const lower = String(message || "").toLowerCase();
+  const routePath = String(routeContext.path || "");
+
+  const openNotifications = /\b(open notifications|show notifications|notifications panel|notification panel)\b/i.test(lower);
+  const markAllRead = /\b(mark all read|read all notifications|mark notifications read)\b/i.test(lower);
+  const clearAllNotifications = /\b(clear notifications|clear all notifications|remove notifications)\b/i.test(lower);
+  const openUnreadTarget = /\b(open unread notification|open latest notification|open first unread|unread notification open)\b/i.test(lower);
+
+  if (openNotifications || markAllRead || clearAllNotifications || openUnreadTarget) {
+    return {
+      type: "dashboard_notification_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: markAllRead ? "mark_all_read" : clearAllNotifications ? "clear_all" : openUnreadTarget ? "open_unread_target" : "open_panel",
+        navigateTo: routePath || null
+      }
+    };
+  }
+
+  const wantsProfileSection = /\b(profile)\b/i.test(lower) && /\b(email|phone|bio)\b/i.test(lower);
+  if (wantsProfileSection) {
+    const section = /\bphone\b/i.test(lower) ? "phone" : /\bbio\b/i.test(lower) ? "bio" : "email";
+    return {
+      type: "profile_section_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: "open_profile_section",
+        section,
+        navigateTo: isOnPathPrefix(routePath, "/profile") ? null : "/profile"
+      }
+    };
+  }
+
+  const wantsSettingsSection =
+    /\b(settings|account settings|preferences)\b/i.test(lower) &&
+    /\b(notifications?|password|delete account|delete-account|remove account)\b/i.test(lower);
+  if (wantsSettingsSection) {
+    const section =
+      /\bpassword\b/i.test(lower)
+        ? "password"
+        : /\b(?:delete account|delete-account|remove account)\b/i.test(lower)
+          ? "delete-account"
+          : "notifications";
+    return {
+      type: "settings_section_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: "open_settings_section",
+        section,
+        navigateTo: isOnPathPrefix(routePath, "/settings") ? null : "/settings"
+      }
+    };
+  }
+
+  const openRoleSwitch = /\b(switch role|change role|open role switch|role switch)\b/i.test(lower);
+  const switchToWorker = /\b(switch to worker|become worker|worker mode)\b/i.test(lower);
+  const switchToBroker = /\b(switch to broker|become broker|broker mode)\b/i.test(lower);
+  const switchToCustomer = /\b(switch to customer|become customer|customer mode)\b/i.test(lower);
+
+  if (!openRoleSwitch && !switchToWorker && !switchToBroker && !switchToCustomer) {
+    return null;
+  }
+
+  let targetRole = "";
+  if (switchToWorker) targetRole = "worker";
+  if (switchToBroker) targetRole = "broker";
+  if (switchToCustomer) targetRole = "customer";
+
+  return {
+    type: "role_switch_action",
+    payload: {
+      id: `act-${Date.now()}`,
+      action: targetRole ? "switch_role" : "open_switch_modal",
+      role: targetRole || null,
+      navigateTo: routePath || null
     }
   };
 }
@@ -571,6 +865,8 @@ function buildWorkerAutomationAction(message, routeContext = {}) {
   const routePath = String(routeContext.path || "");
   const onJobRequestsPage = isOnPathPrefix(routePath, "/job-requests");
   const onSchedulePage = isOnPathPrefix(routePath, "/schedule");
+  const onEarningsPage = isOnPathPrefix(routePath, "/earnings");
+  const onReviewsPage = isOnPathPrefix(routePath, "/reviews");
   const bookingId = parseBookingReferenceId(message);
 
   const hasAcceptKeyword = /\b(accept|approve|take|pick|स्वीकार|एक्सेप्ट)\b/i.test(lower);
@@ -602,6 +898,7 @@ function buildWorkerAutomationAction(message, routeContext = {}) {
   }
 
   const wantsShareLocation = /\b(share( my)? location|start sharing|live location|turn on location|लोकेशन शेयर|लाइव लोकेशन)\b/i.test(lower);
+  const wantsStopSharing = /\b(stop sharing|stop live location|turn off location|stop location|लोकेशन बंद|लोकेशन शेयर बंद)\b/i.test(lower);
   const wantsOpenLocation =
     wantsShareLocation ||
     (/\b(location|map|route|navigation|navigate|लोकेशन|मैप|रूट)\b/i.test(lower) &&
@@ -619,7 +916,38 @@ function buildWorkerAutomationAction(message, routeContext = {}) {
     };
   }
 
+  if (wantsStopSharing) {
+    return {
+      type: "worker_schedule_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: "stop_share",
+        bookingId,
+        autoShare: false,
+        navigateTo: onSchedulePage ? null : "/schedule"
+      }
+    };
+  }
+
   const wantsOpenChat = /\b(chat|message|talk|contact customer|चैट|मैसेज|संदेश)\b/i.test(lower);
+  const wantsChatEdit = /\b(edit|change|update)\b.*\b(chat|message)\b|\b(chat|message)\b.*\b(edit|change|update)\b/i.test(lower);
+  const wantsChatDelete = /\b(delete|remove|erase)\b.*\b(chat|message)\b|\b(chat|message)\b.*\b(delete|remove|erase)\b/i.test(lower);
+
+  if (wantsChatEdit || wantsChatDelete) {
+    const confirmed = /\b(confirm|confirmed|yes|proceed|sure)\b/i.test(lower);
+    return {
+      type: "chat_message_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: wantsChatDelete ? "delete_last" : "edit_last",
+        replacementText: wantsChatDelete ? "" : parseChatEditReplacementText(message),
+        confirmed,
+        bookingId,
+        navigateTo: onSchedulePage ? null : "/schedule"
+      }
+    };
+  }
+
   if (wantsOpenChat) {
     return {
       type: "worker_schedule_action",
@@ -632,12 +960,50 @@ function buildWorkerAutomationAction(message, routeContext = {}) {
     };
   }
 
+  const wantsOpenEarnings =
+    /\b(earnings|income|income report|payment history|earning details)\b/i.test(lower) &&
+    /\b(open|show|view|go|check|filter|देख|खोल)\b/i.test(lower);
+  if (wantsOpenEarnings) {
+    const monthFilter = parseMonthFilterFromMessage(message);
+    const query = monthFilter ? `?month=${encodeURIComponent(monthFilter)}` : "";
+    return {
+      type: "worker_page_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: "open_earnings",
+        monthFilter,
+        navigateTo: onEarningsPage ? null : `/earnings${query}`
+      }
+    };
+  }
+
+  const wantsOpenReviews =
+    /\b(reviews?|rating|feedback)\b/i.test(lower) &&
+    /\b(open|show|view|go|check|filter|देख|खोल)\b/i.test(lower);
+  if (wantsOpenReviews) {
+    const starsFilter = parseStarBandFromMessage(message);
+    const query = starsFilter ? `?stars=${encodeURIComponent(starsFilter)}` : "";
+    return {
+      type: "worker_page_action",
+      payload: {
+        id: `act-${Date.now()}`,
+        action: "open_reviews",
+        starsFilter,
+        navigateTo: onReviewsPage ? null : `/reviews${query}`
+      }
+    };
+  }
+
   return null;
 }
 
 function buildAutomationAction(message, role, routeContext = {}) {
+  const sharedAction = buildSharedDashboardAutomationAction(message, role, routeContext);
+  if (sharedAction) return sharedAction;
+
   if (role === "customer") return buildCustomerAutomationAction(message, routeContext);
   if (role === "worker") return buildWorkerAutomationAction(message, routeContext);
+  if (role === "broker") return buildBrokerAutomationAction(message, routeContext);
   return null;
 }
 

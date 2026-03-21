@@ -134,7 +134,23 @@ const notificationSettingsSchema = new mongoose.Schema(
     jobRequests: { type: Boolean, default: true },
     payments: { type: Boolean, default: true },
     jobAlerts: { type: Boolean, default: true },
-    reminders: { type: Boolean, default: false }
+    reminders: { type: Boolean, default: false },
+    pushEnabled: { type: Boolean, default: true },
+    emailEnabled: { type: Boolean, default: true },
+    smsEnabled: { type: Boolean, default: true },
+    quietHoursStart: { type: String, default: "22:00" },
+    quietHoursEnd: { type: String, default: "08:00" },
+    criticalAlertOverride: { type: Boolean, default: true },
+    weekendOnlyReminders: { type: Boolean, default: false }
+  },
+  { _id: false }
+);
+
+const twoFactorAuthSchema = new mongoose.Schema(
+  {
+    twoFactorAuthEnabled: { type: Boolean, default: false },
+    otpCode: { type: String, default: null },
+    otpExpiresAt: { type: Date, default: null }
   },
   { _id: false }
 );
@@ -162,7 +178,8 @@ const userSchema = new mongoose.Schema(
     customerProfile: { type: customerProfileSchema, default: () => ({}) },
     brokerProfile: { type: brokerProfileSchema, default: () => ({}) },
     workerProfile: { type: workerProfileSchema, default: () => ({}) },
-    notificationSettings: { type: notificationSettingsSchema, default: () => ({}) }
+    notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
+    twoFactorAuth: { type: twoFactorAuthSchema, default: () => ({}) }
   },
   { timestamps: true }
 );
